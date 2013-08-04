@@ -16,3 +16,6 @@ To get started using see the
 
 *Author:*  Rocky Bernstein <rocky@gnu.org> <br>
 [![endorse](https://api.coderwall.com/rocky/endorsecount.png)](https://coderwall.com/rocky)
+
+*Note - when reading some of this documentation, bear in mind that the project name has changed from
+"dbgr" to "realgud", and that "dbgr" is still used frequently throughout the INSTALLATION Wiki entry.
