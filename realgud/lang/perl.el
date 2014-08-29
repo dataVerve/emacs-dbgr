@@ -1,4 +1,4 @@
-;;; Copyright (C) 2011 Rocky Bernstein <rocky@gnu.org>
+;;; Copyright (C) 2011, 2014 Rocky Bernstein <rocky@gnu.org>
 ;;; Common Perl constants and regular expressions.
 (eval-when-compile (require 'cl))
 
@@ -6,6 +6,7 @@
 (require-relative-list '("../common/regexp" "../common/loc" "../common/track")
 		       "realgud-")
 
+(declare-function realgud-goto-line-for-pt 'realgud-track)
 
 ;;  Regular expression that describes a Perl Carp backtrace line.
 ;;  at /tmp/foo.pl line 7
@@ -36,7 +37,7 @@
 
 ;; FIXME: there is probably a less redundant way to do the following
 ;; FNS.
-(defun realgud-perl-goto-errmsg-line (pt)
+(defun realgud:perl-goto-errmsg-line (pt)
   "Display the location mentioned by the Perl error message described by PT."
   (interactive "d")
   (realgud-goto-line-for-pt pt "perl-errmsg"))
@@ -45,9 +46,9 @@
   "Bind the debugger function key layout used by many debuggers.
 
 \\{realgud-example-map-standard}"
-  (define-key map (kbd "C-c !b") 'realgud-goto-debugger-backtrace-line)
-  (define-key map (kbd "C-c !!") 'realgud-goto-lang-backtrace-line)
-  (define-key map (kbd "C-c !e") 'realgud-perl-goto-errmsg-line)
+  (define-key map (kbd "C-c !b") 'realgud:goto-debugger-backtrace-line)
+  (define-key map (kbd "C-c !!") 'realgud:goto-lang-backtrace-line)
+  (define-key map (kbd "C-c !e") 'realgud:perl-goto-errmsg-line)
   )
 
 (provide-me "realgud-lang-")

@@ -1,18 +1,25 @@
-;;; Copyright (C) 2010, 2011 Rocky Bernstein <rocky@gnu.org>
+;;; Copyright (C) 2010-2011, 2014 Rocky Bernstein <rocky@gnu.org>
 (eval-when-compile (require 'cl))
 
 (require 'load-relative)
-(require-relative-list '("../../common/track" "../../common/core") "realgud-")
-(require-relative-list '("init") "realgud-bashdb-")
+(require 'list-utils)
+(require-relative-list '("../../common/track" "../../common/core")
+		       "realgud-")
+(require-relative-list '("init") "realgud:bashdb-")
+
+(declare-function realgud:expand-file-name-if-exists 'realgud-core)
+(declare-function realgud-parse-command-arg  'realgud-core)
+(declare-function realgud-query-cmdline      'realgud-core)
+(declare-function realgud-suggest-invocation 'realgud-core)
 
 ;; FIXME: I think the following could be generalized and moved to
 ;; realgud-... probably via a macro.
-(defvar bashdb-minibuffer-history nil
-  "minibuffer history list for the command `bashdb'.")
+(defvar realgud:bashdb-minibuffer-history nil
+  "minibuffer history list for the command `realgud:bashdb'.")
 
 (easy-mmode-defmap bashdb-minibuffer-local-map
   '(("\C-i" . comint-dynamic-complete-filename))
-  "Keymap for minibuffer prompting of gud startup command."
+  "Keymap for minibuffer prompting of bashdb startup command."
   :inherit minibuffer-local-map)
 
 ;; FIXME: I think this code and the keymaps and history
@@ -21,28 +28,31 @@
   (realgud-query-cmdline
    'bashdb-suggest-invocation
    bashdb-minibuffer-local-map
-   'bashdb-minibuffer-history
+   'realgud:bashdb-minibuffer-history
    opt-debugger))
 
+;;; FIXME: DRY this with other *-parse-cmd-args routines
 (defun bashdb-parse-cmd-args (orig-args)
-  "Parse command line ARGS for the annotate level and name of script to debug.
+  "Parse command line ORIG-ARGS for the annotate level and name of script to debug.
 
-ARGS should contain a tokenized list of the command line to run.
+ORIG-ARGS should contain a tokenized list of the command line to run.
 
-We return the a list containing
-- the command processor (e.g. bashdb) and it's arguments if any - a list of strings
-- the name of the debugger given (e.g. bashdb) and its arguments - a list of strings
-- the script name and its arguments - list of strings
-- whether the annotate or emacs option was given ('-A', '--annotate' or '--emacs) - a boolean
+We return the a list containing:
+* the command processor (e.g. bash) and it's arguments if any - a list of strings
+* the name of the debugger given (e.g. bashdb) and its arguments - a list of strings
+* the script name and its arguments - list of strings
+* whether the annotate or emacs option was given ('-A', '--annotate' or '--emacs) - a boolean
+
+The script name and options mentioning paths are file expanded
 
 For example for the following input
   (map 'list 'symbol-name
-   '(bash -W -C /tmp bashdb --emacs ./gcd.rb a b))
+   '(bash --norc bashdb -l . --emacs ./gcd.sh a b))
 
 we might return:
-   ((bash -W -C) (bashdb --emacs) (./gcd.rb a b) 't)
+   ((\"bash\" \"--norc\") (\"bashdb\" \"-l\" \"/tmp\" \"--emacs\") (\"/tmp/gcd.sh\" \"a\" \"b\") t)
 
-NOTE: the above should have each item listed in quotes.
+Note that path elements have been expanded via `realgud:expand-file-name-if-exists'.
 "
 
   ;; Parse the following kind of pattern:
@@ -64,6 +74,8 @@ NOTE: the above should have each item listed in quotes.
 	 (if (member system-type (list 'windows-nt 'cygwin 'msdos))
 	     "^bash*\\(.exe\\)?$"
 	   "^bash*$"))
+	(bashdb-two-arg-name)
+	(debugger-flag nil) ;; 't if "bash --debugger" given
 
 	;; Things returned
 	(script-name nil)
@@ -77,60 +89,72 @@ NOTE: the above should have each item listed in quotes.
 	;; Got nothing: return '(nil, nil)
 	(list interpreter-args debugger-args script-args annotate-p)
       ;; else
-      ;; Strip off optional "ruby" or "ruby182" etc.
+      ;; Strip off optional "bash" or "bash4" etc.
       (when (string-match interp-regexp
 			  (file-name-sans-extension
 			   (file-name-nondirectory (car args))))
 	(setq interpreter-args (list (pop args)))
 
-	;; Strip off Ruby-specific options
+	;; Strip off bash-specific options
 	(while (and args
 		    (string-match "^-" (car args)))
 	  (setq pair (realgud-parse-command-arg
 		      args bash-two-args bash-opt-two-args))
+	  (if (equal "--debugger" (caar pair))
+	      (setq debugger-flag 't))
 	  (nconc interpreter-args (car pair))
 	  (setq args (cadr pair))))
 
       ;; Remove "bashdb" from "bashdb --bashdb-options script
       ;; --script-options"
-      (setq debugger-name (file-name-sans-extension
-			   (file-name-nondirectory (car args))))
-      (unless (string-match "^bashdb$" debugger-name)
-	(message
-	 "Expecting debugger name `%s' to be `bashdb'"
-	 debugger-name))
-      (setq debugger-args (list (pop args)))
+      (unless debugger-flag
+	(setq debugger-name (file-name-sans-extension
+			     (file-name-nondirectory (car args))))
+	(unless (string-match "^bashdb$" debugger-name)
+	  (message
+	   "Expecting debugger name `%s' to be `bashdb'"
+	   debugger-name))
+	(setq debugger-args (list (pop args)))
+	)
 
       ;; Skip to the first non-option argument.
       (while (and args (not script-name))
 	(let ((arg (car args)))
 	  (cond
 	   ;; Annotation or emacs option with level number.
-	   ((or (member arg '("--annotate" "-A"))
-		(equal arg "--emacs"))
+	   ((member arg '("--annotate" "-A" "--emacs"))
 	    (setq annotate-p t)
 	    (nconc debugger-args (list (pop args))))
 	   ;; Combined annotation and level option.
 	   ((string-match "^--annotate=[0-9]" arg)
 	    (nconc debugger-args (list (pop args)) )
 	    (setq annotate-p t))
-	   ;; Options with arguments.
+	   ;; Library option
+	   ((member arg '("--library" "-l"))
+	    (setq arg (pop args))
+	    (nconc debugger-args
+		   (list arg (realgud:expand-file-name-if-exists
+			      (pop args)))))
+	   ;; Other options with arguments.
 	   ((string-match "^-" arg)
 	    (setq pair (realgud-parse-command-arg
 			args bashdb-two-args bashdb-opt-two-args))
 	    (nconc debugger-args (car pair))
 	    (setq args (cadr pair)))
 	   ;; Anything else must be the script to debug.
-	   (t (setq script-name arg)
-	      (setq script-args args))
+	   (t (setq script-name (realgud:expand-file-name-if-exists arg))
+	      (setq script-args (cons script-name (cdr args))))
 	   )))
       (list interpreter-args debugger-args script-args annotate-p))))
 
-(defvar bashdb-command-name) ; # To silence Warning: reference to free variable
+;; To silence Warning: reference to free variable
+(defvar realgud:bashdb-command-name)
+
 (defun bashdb-suggest-invocation (debugger-name)
   "Suggest a bashdb command invocation via `realgud-suggest-invocaton'"
-  (realgud-suggest-invocation bashdb-command-name bashdb-minibuffer-history
-			   "Shell-script" "\\.sh$"))
+  (realgud-suggest-invocation realgud:bashdb-command-name
+			      realgud:bashdb-minibuffer-history
+			      "Shell-script" "\\.sh$"))
 
 (defun bashdb-reset ()
   "Bashdb cleanup - remove debugger's internal buffers (frame,
@@ -151,9 +175,9 @@ breakpoints, etc.)."
 ;; 	  bashdb-debugger-support-minor-mode-map-when-deactive))
 
 
-(defun bashdb-customize ()
+(defun realgud:bashdb-customize ()
   "Use `customize' to edit the settings of the `bashdb' debugger."
   (interactive)
-  (customize-group 'bashdb))
+  (customize-group 'realgud:bashdb))
 
-(provide-me "realgud-bashdb-")
+(provide-me "realgud:bashdb-")

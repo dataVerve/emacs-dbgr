@@ -1,18 +1,48 @@
-;;; Copyright (C) 2010, 2011, 2012 Rocky Bernstein <rocky@gnu.org>
+;;; Copyright (C) 2010-2014 Rocky Bernstein <rocky@gnu.org>
 ; (require 'term)
-(if (< emacs-major-version 23)
+(if (< emacs-major-version 24)
     (error
-     "You need at least Emacs 23 or greater to run this - you have version %d"
+     "You need at least Emacs 24 or greater to run this - you have version %d"
      emacs-major-version))
 
 (require 'comint)
 (require 'load-relative)
-(require-relative-list '("fringe" "helper" "lang" "reset") "realgud-")
+(require-relative-list '("fringe" "helper" "lang" "reset")
+		       "realgud-")
 (require-relative-list '("buffer/command" "buffer/source") "realgud-buffer-")
 
-(declare-function realgud-short-key-mode-setup "shortkey.el")
+(declare-function comint-exec  'comint)
+(declare-function comint-mode  'comint)
+(declare-function realgud-bp-remove-icons             'realgud-bp)
+(declare-function realgud-cmdbuf-args=                'realgud-buffer-command)
+(declare-function realgud-cmdbuf-command-string       'realgud-buffer-command)
+(declare-function realgud-cmdbuf-debugger-name        'realgud-buffer-command)
+(declare-function realgud-cmdbuf-info-bp-list=        'realgud-buffer-command)
+(declare-function realgud-cmdbuf-info-in-debugger?=   'realgud-buffer-command)
+(declare-function realgud-cmdbuf-mode-line-update     'realgud-buffer-command)
+(declare-function realgud-cmdbuf?                     'realgud-helper)
+(declare-function realgud-command-string              'realgud-buffer-command)
+(declare-function realgud-fringe-erase-history-arrows 'realgud-buffer-command)
+(declare-function realgud-get-cmdbuf                  'realgud-helper)
+(declare-function realgud-reset                       'realgud-reset)
+(declare-function realgud-short-key-mode-setup        'realgud-shortkey)
+(declare-function realgud-srcbuf-command-string       'realgud-buffer-source)
+(declare-function realgud-srcbuf-debugger-name        'realgud-buffer-source)
+(declare-function realgud-srcbuf-init                 'realgud-buffer-source)
+(declare-function realgud-srcbuf?                     'realgud-buffer-source)
+(declare-function realgud-suggest-lang-file           'realgud-lang)
 
 (defvar realgud-srcbuf-info)
+
+(defun realgud:expand-file-name-if-exists (filename)
+  "Return FILENAME expanded using `expand-file-name' if that name exists.
+Otherwise, just return FILENAME."
+  (let* ((expanded-filename (expand-file-name filename))
+	 (result (cond ((file-exists-p expanded-filename)
+			  expanded-filename)
+			 ('t filename))))
+    result)
+)
 
 (defun realgud-suggest-invocation
   (debugger-name minibuffer-history lang-str lang-ext-regexp
@@ -25,13 +55,10 @@ if that exists.  Finally we try to find a suitable program file
 using LANG-STR and LANG-EXT-REGEXP."
   (let* ((buf (current-buffer))
 	 (cmd-str-cmdbuf (realgud-cmdbuf-command-string buf))
-	 (cmd-str-srcbuf (realgud-srcbuf-command-string buf))
 	 )
     (cond
      ((and cmd-str-cmdbuf (equal debugger-name (realgud-cmdbuf-debugger-name buf)))
       cmd-str-cmdbuf)
-     ((and cmd-str-srcbuf (equal debugger-name (realgud-srcbuf-debugger-name buf)))
-      cmd-str-srcbuf)
      ((and minibuffer-history (listp minibuffer-history))
       (car minibuffer-history))
      (t (concat debugger-name " "
@@ -96,39 +123,6 @@ return the first argument is always removed.
 	(cons (list arg) (list remaining))))
      (t (cons (list arg) (list remaining))))))
 
-(defun realgud-run-process(debugger-name script-filename cmd-args
-				      track-mode-func &optional no-reset)
-  "Runs `realgud-exec-shell with DEBUGGER-NAME SCRIPT-FILENAME PROGRAM-ARGS
-NO-RESET and SCRIPT-ARGS. If this succeeeds we call TRACK-MODE-FUNC
-and save cmd-args in command-buffer for use if we want to restarting.
-If we don't succeed in running the program we will switch to the command buffer
-which shows details of the error. The command buffer or nil is returned"
-
-  (let ((cmd-buf))
-    (condition-case nil
-	(setq cmd-buf
-	      (apply 'realgud-exec-shell debugger-name script-filename
-		     (car cmd-args) no-reset (cdr cmd-args)))
-      (error nil))
-    ;; FIXME: Is there probably is a way to remove the
-    ;; below test and combine in condition-case?
-    (let ((process (get-buffer-process cmd-buf)))
-      (if (and process (eq 'run (process-status process)))
-	  (progn
-	    (switch-to-buffer cmd-buf)
-	    (funcall track-mode-func 't)
-	    (realgud-cmdbuf-info-cmd-args= cmd-args)
-	    )
-	(progn
-	  (if cmd-buf (switch-to-buffer cmd-buf))
-	  (message "Error running command: %s %s" debugger-name script-filename)
-	  )
-	)
-      )
-    cmd-buf
-    )
-  )
-
 (defun realgud-terminate-srcbuf (&optional srcbuf)
   "Resets source buffer."
   (interactive "bsource buffer: ")
@@ -136,12 +130,10 @@ which shows details of the error. The command buffer or nil is returned"
   (with-current-buffer srcbuf
     (realgud-fringe-erase-history-arrows)
     (realgud-bp-remove-icons (point-min) (point-max))
-    (if (realgud-srcbuf?)
-	(progn
-	  (realgud-short-key-mode-setup nil)
-	  (redisplay)
-	  ))
-    )
+    (when (realgud-srcbuf?)
+      (realgud-short-key-mode-setup nil)
+      (redisplay)
+      ))
   )
 
 (defun realgud-terminate (&optional buf)
@@ -154,6 +146,7 @@ icons and resets short-key mode."
     (if cmdbuf
 	(with-current-buffer cmdbuf
 	  (realgud-cmdbuf-info-in-debugger?= nil)
+	  (realgud-cmdbuf-info-bp-list= '())
 	  (realgud-cmdbuf-mode-line-update)
 	  (realgud-fringe-erase-history-arrows)
 	  (if realgud-cmdbuf-info
@@ -171,8 +164,17 @@ icons and resets short-key mode."
     )
   )
 
+(defun realgud:kill-buffer-hook ()
+  "When a realgud command buffer is killed, call `realgud-terminate' to
+clean up.
+Note that `realgud-term-sentinel' is not helpful here because
+the buffer and data associated with it are already gone."
+  (when (realgud-cmdbuf?) (realgud-terminate (current-buffer)))
+)
+(add-hook 'kill-buffer-hook 'realgud:kill-buffer-hook)
+
 (defun realgud-term-sentinel (process string)
-  "Called when PROCESS dies. We call `realgud-quit' to clean up."
+  "Called when PROCESS dies. We call `realgud-terminate' to clean up."
   (let ((cmdbuf (realgud-get-cmdbuf)))
     (if cmdbuf (realgud-terminate cmdbuf)))
   (message "That's all folks.... %s" string))
@@ -197,18 +199,37 @@ marginal icons is reset."
   (let* ((starting-directory
 	  (or (file-name-directory script-filename)
 	      default-directory "./"))
-	 (cmdproc-buffer
-	  (get-buffer-create
-	   (format "*%s %s shell*"
-		   (file-name-nondirectory debugger-name)
-		   (file-name-nondirectory script-filename))))
+	 (cmdproc-buffer-name
+	  (format "*%s %s shell*"
+		  (file-name-nondirectory debugger-name)
+		  (file-name-nondirectory script-filename)))
+	 (cmdproc-buffer (get-buffer-create cmdproc-buffer-name))
 	 (realgud-buf (current-buffer))
+	 (cmd-args (cons program args))
 	 (process (get-buffer-process cmdproc-buffer)))
+
+
+    (with-current-buffer cmdproc-buffer
+      ;; If the found command buffer isn't for the same debugger
+      ;; invocation command, rename that and start a new one.
+      ;;
+      ;; For example: "bashdb /tmp/foo" does not match "bashdb
+      ;; /etc/foo" even though they both canonicalize to the buffer
+      ;; "*bashdb foo shell*"
+      (unless (and (realgud-cmdbuf?)
+		 (equal cmd-args
+			(realgud-cmdbuf-info-cmd-args realgud-cmdbuf-info)))
+	(rename-uniquely)
+	(setq cmdproc-buffer (get-buffer-create cmdproc-buffer-name))
+	(setq process nil)
+	))
+
     (unless (and process (eq 'run (process-status process)))
       (with-current-buffer cmdproc-buffer
 	(and (realgud-cmdbuf?) (not no-reset) (realgud-reset))
 	(setq default-directory default-directory)
-	(insert "Current directory is " default-directory "\n")
+	(insert "Current directory: " default-directory "\n")
+ 	(insert "Command: " (mapconcat 'identity cmd-args " ") "\n")
 
 	;; For term.el
 	;; (term-mode)
@@ -235,13 +256,18 @@ marginal icons is reset."
 	(setq process (get-buffer-process cmdproc-buffer))
 
 	(if (and process (eq 'run (process-status process)))
-	    (let ((src-buffer (find-file-noselect script-filename))
-		  (cmdline-list (cons program args)))
-	      ;; is this right?
-	      (point-max)
-	      (realgud-srcbuf-init src-buffer cmdproc-buffer
-				debugger-name cmdline-list))
-	  (insert (format "Failed to invoke shell command: %s %s" program args)))
+	  (let ((src-buffer (find-file-noselect script-filename))
+		(cmdline-list (cons program args)))
+	    ;; is this right?
+	    (point-max)
+	    (realgud-srcbuf-init src-buffer cmdproc-buffer))
+	  ;; else
+	  (insert
+	   (format
+	    "Failed to invoke debugger %s on program %s with args %s\n"
+	    debugger-name program (mapconcat 'identity args " ")))
+	  (error cmdproc-buffer)
+	  )
 	(process-put process 'buffer cmdproc-buffer)))
     cmdproc-buffer))
 

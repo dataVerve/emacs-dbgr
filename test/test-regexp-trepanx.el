@@ -3,12 +3,12 @@
 
 (test-simple-start)
 
-(set (make-local-variable 'bps)
-     (gethash "brkpt-set"       realgud-trepanx-pat-hash))
+(set (make-local-variable 'helper-bps)
+     (gethash "brkpt-set"       realgud:trepanx-pat-hash))
 (set (make-local-variable 'prompt)
-     (gethash "prompt"          realgud-trepanx-pat-hash))
-(set (make-local-variable 'tb)
-     (gethash "lang-backtrace"  realgud-trepanx-pat-hash))
+     (gethash "prompt"          realgud:trepanx-pat-hash))
+(set (make-local-variable 'helper-tb)
+     (gethash "lang-backtrace"  realgud:trepanx-pat-hash))
 
 ;; FIXME: we get a void variable somewhere in here when running
 ;;        even though we define it in lexical-let. Dunno why.
@@ -22,7 +22,7 @@
 (assert-equal 0 (tb-loc-match text)
 	      "match trepanx location")
 (assert-equal "tmp/boom.rb"
-	      (match-string (realgud-loc-pat-file-group tb)
+	      (match-string (realgud-loc-pat-file-group helper-tb)
 			    text)
 	      "extract traceback file name")
 (setq text
@@ -30,18 +30,18 @@
 (assert-equal 0 (tb-loc-match text)
 	      "find a trepanx location")
 (assert-equal "/tmp/blam.rb"
-	      (match-string (realgud-loc-pat-file-group tb)
+	      (match-string (realgud-loc-pat-file-group helper-tb)
 			    text)
 	      "extract traceback file name")
 
 (assert-equal "5"
-	      (match-string (realgud-loc-pat-line-group tb)
+	      (match-string (realgud-loc-pat-line-group helper-tb)
 			    text)
 	      "extract traceback line number")
 
 (note "prompt matching")
 (set (make-local-variable 'prompt-pat)
-     (gethash "prompt" realgud-trepanx-pat-hash))
+     (gethash "prompt" realgud:trepanx-pat-hash))
 (prompt-match "((trepanx)): " nil "nested debugger prompt: %s")
 (prompt-match "((trepanx@55)): "
 	      "@55" "nested debugger prompt with addr: %s")
@@ -56,12 +56,12 @@
 (assert-t (numberp (bp-loc-match text))
 	  "basic breakpoint location")
 (assert-equal "/bin/irb"
-	      (match-string (realgud-loc-pat-file-group bps)
+	      (match-string (realgud-loc-pat-file-group helper-bps)
 			    text)
 	      "extract breakpoint file name"
 	      )
 (assert-equal "2"
-	      (match-string (realgud-loc-pat-line-group bps)
+	      (match-string (realgud-loc-pat-line-group helper-bps)
 			    text)
 	      "extract breakpoint line number"
 	      )

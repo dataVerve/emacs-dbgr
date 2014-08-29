@@ -1,36 +1,40 @@
-;;; Copyright (C) 2010, 2011 Rocky Bernstein <rocky@gnu.org>
+;;; Copyright (C) 2010-2011, 2014 Rocky Bernstein <rocky@gnu.org>
 ;;  `trepanx' Main interface to trepanx via Emacs
 (require 'load-relative)
 (require-relative-list '("../../common/helper") "realgud-")
 (require-relative-list '("../../common/track") "realgud-")
-(require-relative-list '("core" "track-mode") "realgud-trepanx-")
+(require-relative-list '("core" "track-mode") "realgud:trepanx-")
+
+(declare-function trepanx-query-cmdline  'realgud:trepanx-core)
+(declare-function trepanx-parse-cmd-args 'realgud:trepanx-core)
+(declare-function realgud-run-process 'realgud-core)
+
 ;; This is needed, or at least the docstring part of it is needed to
-;; get the customization menu to work in Emacs 23.
-(defgroup trepanx nil
-  "The Rubinius \"trepanning\" debugger"
-  :group 'processes
+;; get the customization menu to work in Emacs 24.
+(defgroup realgud:trepanx nil
+  "The realgud interface to the Rubinius \"trepanning\" debugger"
   :group 'ruby
-  :group 'dbgr
+  :group 'realgud
   :version "23.1")
 
 ;; -------------------------------------------------------------------
 ;; User definable variables
 ;;
 
-(defcustom trepanx-command-name
+(defcustom realgud:trepanx-command-name
   ;;"trepanx --emacs 3"
   "trepanx"
   "File name for executing the Ruby debugger and command options.
 This should be an executable on your path, or an absolute file name."
   :type 'string
-  :group 'trepanx)
+  :group 'realgud:trepanx)
 
 ;; -------------------------------------------------------------------
 ;; The end.
 ;;
 
 ;;;###autoload
-(defun realgud-trepanx (&optional opt-command-line no-reset)
+(defun realgud:trepanx (&optional opt-command-line no-reset)
   "Invoke the trepanx Ruby debugger and start the Emacs user interface.
 
 String COMMAND-LINE specifies how to run trepanx.
@@ -50,11 +54,12 @@ marginal icons is reset."
 	 (script-name (car script-args))
 	 (cmd-buf))
     (realgud-run-process "trepanx" script-name cmd-args
-		      'trepanx-track-mode no-reset)
+		      'trepanx-track-mode
+		      'realgud:trepanx-minibuffer-history
+		      no-reset)
     )
   )
 
-(defalias 'trepanx 'realgud-trepanx)
+(defalias 'trepanx 'realgud:trepanx)
 
 (provide-me "realgud-")
-;;; trepanx.el ends here

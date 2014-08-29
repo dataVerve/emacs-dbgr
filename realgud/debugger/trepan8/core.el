@@ -1,4 +1,4 @@
-;;; Copyright (C) 2010, 2011 Rocky Bernstein <rocky@gnu.org>
+;;; Copyright (C) 2010-2011, 2014 Rocky Bernstein <rocky@gnu.org>
 (eval-when-compile (require 'cl))
 
 (require 'load-relative)
@@ -7,12 +7,17 @@
 			 "../../common/core"
 			 "../../common/lang")
 		       "realgud-")
-(require-relative-list '("init") "realgud-trepan8-")
+(require-relative-list '("init") "realgud:trepan8-")
+
+(declare-function realgud:expand-file-name-if-exists 'realgud-core)
+(declare-function realgud-parse-command-arg  'realgud-core)
+(declare-function realgud-query-cmdline      'realgud-core)
+(declare-function realgud-suggest-invocation 'realgud-core)
 
 ;; FIXME: I think the following could be generalized and moved to
 ;; realgud-... probably via a macro.
-(defvar trepan8-minibuffer-history nil
-  "minibuffer history list for the command `trepan8'.")
+(defvar realgud:trepan8-minibuffer-history nil
+  "minibuffer history list for the command `realgud:trepan8'.")
 
 (easy-mmode-defmap trepan8-minibuffer-local-map
   '(("\C-i" . comint-dynamic-complete-filename))
@@ -25,7 +30,7 @@
   (realgud-query-cmdline
    'trepan8-suggest-invocation
    trepan8-minibuffer-local-map
-   'trepan8-minibuffer-history
+   'realgud:trepan8-minibuffer-history
    opt-debugger))
 
 (defun trepan8-parse-cmd-args (orig-args)
@@ -34,10 +39,10 @@
 ARGS should contain a tokenized list of the command line to run.
 
 We return the a list containing
-- the command processor (e.g. ruby) and it's arguments if any - a list of strings
-- the name of the debugger given (e.g. trepan8) and its arguments - a list of strings
-- the script name and its arguments - list of strings
-- whether the annotate or emacs option was given ('-A', '--annotate' or '--emacs) - a boolean
+* the command processor (e.g. ruby) and it's arguments if any - a list of strings
+* the name of the debugger given (e.g. trepan8) and its arguments - a list of strings
+* the script name and its arguments - list of strings
+* whether the annotate or emacs option was given ('-A', '--annotate' or '--emacs) - a boolean
 
 For example for the following input
   (map 'list 'symbol-name
@@ -46,7 +51,7 @@ For example for the following input
 we might return:
    ((ruby1.9 -W -C) (trepan8 --emacs) (./gcd.rb a b) 't)
 
-NOTE: the above should have each item listed in quotes.
+Note that the script name path has been expanded via `expand-file-name'.
 "
 
   ;; Parse the following kind of pattern:
@@ -121,16 +126,19 @@ NOTE: the above should have each item listed in quotes.
 	    (nconc debugger-args (car pair))
 	    (setq args (cadr pair)))
 	   ;; Anything else must be the script to debug.
-	   (t (setq script-name arg)
-	      (setq script-args args))
+	   (t (setq script-name (realgud:expand-file-name-if-exists arg))
+	      (setq script-args (cons script-name (cdr args))))
 	   )))
       (list interpreter-args debugger-args script-args annotate-p))))
 
-(defvar trepan8-command-name) ; # To silence Warning: reference to free variable
+;; To silence Warning: reference to free variable
+(defvar realgud:trepan8-command-name)
+
 (defun trepan8-suggest-invocation (debugger-name)
   "Suggest a trepan8 command invocation via `realgud-suggest-invocaton'"
-  (realgud-suggest-invocation trepan8-command-name trepan8-minibuffer-history
-			   "ruby" "\\.rb$"))
+  (realgud-suggest-invocation realgud:trepan8-command-name
+			      realgud:trepan8-minibuffer-history
+			      "ruby" "\\.rb$"))
 
 (defun trepan8-reset ()
   "Trepan8 cleanup - remove debugger's internal buffers (frame,
@@ -151,9 +159,9 @@ breakpoints, etc.)."
 ;; 	  trepan8-debugger-support-minor-mode-map-when-deactive))
 
 
-(defun trepan8-customize ()
+(defun realgud:trepan8-customize ()
   "Use `customize' to edit the settings of the `trepan8' debugger."
   (interactive)
-  (customize-group 'trepan8))
+  (customize-group 'realgud:trepan8))
 
-(provide-me "realgud-trepan8-")
+(provide-me "realgud:trepan8-")

@@ -1,4 +1,4 @@
-;;; Copyright (C) 2010, 2012-2013 Rocky Bernstein <rocky@gnu.org>
+;;; Copyright (C) 2010, 2012-2014 Rocky Bernstein <rocky@gnu.org>
 ;;; source-code buffer code
 (eval-when-compile
   (require 'cl-lib)
@@ -9,17 +9,20 @@
 (require 'load-relative)
 (require-relative-list '("../helper" "../key") "realgud-")
 
+(declare-function realgud-populate-common-keys 'realgud-menu)
+(declare-function buffer-killed? 'realgud-helper)
+(declare-function buffer-loc-line-number? 'realgud-loc)
+(declare-function realgud-cmdbuf-add-srcbuf 'realgud-cmdbuf)
+(declare-function realgud-cmdbuf-info-bp-list 'realgud-cmdbuf)
+(declare-function realgud-loc-marker          'realgud-loc)
+(declare-function realgud-loc-line-number     'realgud-loc)
+(declare-function realgud-loc-num             'realgud-loc)
+(declare-function make-realgud-loc-hist       'realgud-lochist)
+(declare-function realgud-get-srcbuf          'helper)
+
 (defstruct realgud-srcbuf-info
   "debugger object/structure specific to a (top-level) source program
 to be debugged."
-  debugger-name  ;; Name of debugger. We could get this from the
-                 ;; process command buffer, but we want to store it
-                 ;; here in case the command buffer disappears. Used
-                 ;; in recomputing a suitiable debugger invocation.
-  cmd-args       ;; Debugger command invocation as a list of strings
-                 ;; or nil. See above about why we don't get from the
-                 ;; process command buffer. Used to suggest a debugger
-                 ;; invocation.
   cmdproc        ;; buffer of the associated debugger process
   cur-pos        ;; If not nil, the debugger thinks we are currently
 		 ;; positioned at a corresponding place in the
@@ -42,52 +45,11 @@ to be debugged."
   ;;
 )
 
-(declare-function realgud-get-srcbuf(&optional opt-buffer opt-loc))
-
-(defun realgud-srcbuf-info-describe (&optional buffer)
-  "Display realgud-srcbuf-info fields of BUFFER.
-BUFFER is either a debugger command or source buffer. If BUFFER is not given
-the current buffer is used as a starting point.
-Information is put in an internal buffer called *Describe*."
-  (interactive "")
-  (setq buffer (realgud-get-srcbuf buffer))
-  (if buffer
-      (with-current-buffer buffer
-	(let ((info realgud-srcbuf-info)
-	      (srcbuf-name (buffer-name)))
-	  (switch-to-buffer (get-buffer-create "*Describe*"))
-	  (delete-region (point-min) (point-max))
-	  (mapc 'insert
-		(list
-		 (format "realgud-srcbuf-info for %s\n\n" srcbuf-name)
-		 (format "Debugger name (debugger-name): %s\n"
-			 (realgud-srcbuf-info-debugger-name info))
-		 (format "Command-line args (cmd-args): %s\n"
-			 (realgud-srcbuf-info-cmd-args info))
-		 (format "Command process buffer (cmdproc): %s\n"
-			 (realgud-srcbuf-info-cmdproc info))
-		 (format "Current debugger position (cur-pos): %s\n"
-			 (realgud-srcbuf-info-cur-pos info))
-		 (format "Was source previously in short-key mode? (short-key?): %s\n"
-			 (realgud-srcbuf-info-short-key? info))
-
-		 (format "Was source previously read only? (was-read-only): %s\n"
-			 (realgud-srcbuf-info-was-read-only? info))
-
-		 )))
-	)
-    (message "Buffer %s is not a debugger buffer; nothing done."
-	     (or buffer (current-buffer)))
-    )
-  )
-
 
 (defalias 'realgud-srcbuf-info? 'realgud-srcbuf-p)
 
 ;; FIXME: figure out how to put in a loop.
-(realgud-struct-field-setter "realgud-srcbuf-info" "cmd-args")
 (realgud-struct-field-setter "realgud-srcbuf-info" "cmdproc")
-(realgud-struct-field-setter "realgud-srcbuf-info" "debugger-name")
 (realgud-struct-field-setter "realgud-srcbuf-info" "short-key?")
 (realgud-struct-field-setter "realgud-srcbuf-info" "was-read-only?")
 
@@ -127,17 +89,15 @@ Information is put in an internal buffer called *Describe*."
 (make-variable-buffer-local 'realgud-srcbuf-info)
 
 (defun realgud-srcbuf-init
-  (src-buffer cmdproc-buffer debugger-name cmd-args)
+  (src-buffer cmdproc-buffer)
   "Initialize SRC-BUFFER as a source-code buffer for a debugger.
 CMDPROC-BUFFER is the process-command buffer containing the
-debugger.  DEBUGGER-NAME is the name of the debugger.  as a main
-program."
+debugger.  DEBUGGER-NAME is the name of the debugger as a main
+program name."
   (with-current-buffer cmdproc-buffer
     (set-buffer src-buffer)
     (set (make-local-variable 'realgud-srcbuf-info)
 	 (make-realgud-srcbuf-info
-	  :debugger-name debugger-name
-	  :cmd-args cmd-args
 	  :cmdproc cmdproc-buffer
 	  :loc-hist (make-realgud-loc-hist)))
     (put 'realgud-srcbuf-info 'variable-documentation
@@ -146,11 +106,7 @@ program."
 (defun realgud-srcbuf-init-or-update (src-buffer cmdproc-buffer)
   "Call `realgud-srcbuf-init' for SRC-BUFFER update `realgud-srcbuf-info' variables
 in it with those from CMDPROC-BUFFER"
-  (let ((debugger-name)
-	(cmd-args))
-   (with-current-buffer-safe cmdproc-buffer
-     (setq debugger-name (realgud-sget 'cmdbuf-info 'debugger-name))
-     (setq cmd-args (realgud-cmdbuf-info-cmd-args realgud-cmdbuf-info)))
+  (realgud-cmdbuf-add-srcbuf src-buffer cmdproc-buffer)
   (with-current-buffer-safe src-buffer
     (realgud-populate-common-keys
      ;; use-local-map returns nil so e have to call (current-local-map)
@@ -158,22 +114,47 @@ in it with those from CMDPROC-BUFFER"
      (or (current-local-map) (use-local-map (make-sparse-keymap))
 	 (current-local-map)))
     (if (realgud-srcbuf-info? realgud-srcbuf-info)
-	(progn
-	  (realgud-srcbuf-info-cmdproc= cmdproc-buffer)
-	  (realgud-srcbuf-info-debugger-name= debugger-name)
-	  (realgud-srcbuf-info-cmd-args= cmd-args)
-	  )
-      (realgud-srcbuf-init src-buffer cmdproc-buffer "unknown" nil)))))
+	(realgud-srcbuf-info-cmdproc= cmdproc-buffer)
+      (realgud-srcbuf-init src-buffer cmdproc-buffer))))
 
-(defun realgud-srcbuf-command-string(src-buffer)
-  "Get the command string invocation for this source buffer"
-  (with-current-buffer-safe src-buffer
-    (cond
-     ((and (realgud-srcbuf? src-buffer)
-	   (realgud-sget 'srcbuf-info 'cmd-args))
-      (mapconcat (lambda(x) x)
-		 (realgud-sget 'srcbuf-info 'cmd-args)
-		 " "))
-     (t nil))))
+(defun realgud-srcbuf-bp-list(&optional buffer)
+  "Return a list of breakpoint loc structures that reside in
+BUFFER which should be an initialized source buffer."
+  (let ((src-buffer (realgud-get-srcbuf buffer)))
+    (if src-buffer
+	(with-current-buffer src-buffer
+	(let* ((info realgud-srcbuf-info)
+	       (cmdbuf (realgud-srcbuf-info-cmdproc info)))
+	  (with-current-buffer cmdbuf
+	    (let ((bp-list
+		   (realgud-cmdbuf-info-bp-list realgud-cmdbuf-info)))
+	      (delq nil
+		    (mapcar (lambda (loc)
+			      (cond ((eq src-buffer
+					 (marker-buffer (realgud-loc-marker loc)))
+				     loc)
+				    (nil)))
+			    bp-list))
+	      )))))))
+
+(defun realgud-get-bpnum-from-line-num(line-num &optional buffer)
+  "Find a breakpoint number associated with LINE-NUM in source code BUFFER.
+If none exists return nil"
+  (let ((src-buffer (realgud-get-srcbuf buffer))
+	(bp-num nil)
+	(bp)
+	(bp-list)
+	)
+    (if src-buffer
+	(progn
+	  (setq bp-list (realgud-srcbuf-bp-list src-buffer))
+	  (while (and (not bp-num) bp-list)
+	    (setq bp (car bp-list))
+	    (setq bp-list (cdr bp-list))
+	    (if (eq line-num (realgud-loc-line-number bp))
+		(setq bp-num (realgud-loc-num bp)))
+	    ))
+      )
+    bp-num))
 
 (provide-me "realgud-buffer-")

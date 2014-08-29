@@ -1,4 +1,4 @@
-;;; Copyright (C) 2011 Rocky Bernstein <rocky@gnu.org>
+;;; Copyright (C) 2011, 2013-2014 Rocky Bernstein <rocky@gnu.org>
 (eval-when-compile (require 'cl))
 
 (require 'load-relative)
@@ -6,47 +6,54 @@
 			 "../../common/core"
 			 "../../common/lang")
 		       "realgud-")
-(require-relative-list '("init") "realgud-perldb-")
+(require-relative-list '("init") "realgud:perldb-")
+
+(declare-function realgud-lang-mode?         'realgud-lang)
+(declare-function realgud:expand-file-name-if-exists 'realgud-core)
+(declare-function realgud-parse-command-arg  'realgud-core)
+(declare-function realgud-query-cmdline      'realgud-core)
+(declare-function realgud-suggest-invocation 'realgud-core)
 
 ;; FIXME: I think the following could be generalized and moved to
 ;; realgud-... probably via a macro.
-(defvar perldb-minibuffer-history nil
+(defvar realgud:perldb-minibuffer-history nil
   "minibuffer history list for the command `perldb'.")
 
-(easy-mmode-defmap realgud-perldb-minibuffer-local-map
+(easy-mmode-defmap realgud:perldb-minibuffer-local-map
   '(("\C-i" . comint-dynamic-complete-filename))
   "Keymap for minibuffer prompting of perldb startup command."
   :inherit minibuffer-local-map)
 
 ;; FIXME: I think this code and the keymaps and history
 ;; variable chould be generalized, perhaps via a macro.
-(defun realgud-perldb-query-cmdline (&optional opt-debugger)
+(defun realgud:perldb-query-cmdline (&optional opt-debugger)
   (realgud-query-cmdline
-   'realgud-perldb-suggest-invocation
-   realgud-perldb-minibuffer-local-map
-   'realgud-perldb-minibuffer-history
+   'realgud:perldb-suggest-invocation
+   realgud:perldb-minibuffer-local-map
+   'realgud:perldb-minibuffer-history
    opt-debugger))
 
-(defun realgud-perldb-parse-cmd-args (orig-args)
+;;; FIXME: DRY this with other *-parse-cmd-args routines
+(defun realgud:perldb-parse-cmd-args (orig-args)
   "Parse command line ARGS for the annotate level and name of script to debug.
 
-ARGS should contain a tokenized list of the command line to run.
+ORIG-ARGS should contain a tokenized list of the command line to run.
 
 We return the a list containing
 
-- the command processor (e.g. perl) and it's arguments if any - a
+* the command processor (e.g. perl) and it's arguments if any - a
   list of strings
 
-- the script name and its arguments - list of strings
+* the script name and its arguments - list of strings
 
-For example for the following input
+For example for the following input:
   (map 'list 'symbol-name
    '(perl -W -C /tmp -d ./gcd.pl a b))
 
 we might return:
-   ((perl -W -C -d) (./gcd.pl a b))
+   ((\"perl\" \"-W\" \"-C\" \"-d\") nil (\"/tmp/gcd.pl\" \"a\" \"b\"))
 
-NOTE: the above should have each item listed in quotes.
+Note that path elements have been expanded via `realgud:expand-file-name-if-exists'.
 "
 
   ;; Parse the following kind of pattern:
@@ -76,35 +83,42 @@ NOTE: the above should have each item listed in quotes.
 	)
 
     (if (not (and args))
-	;; Got nothing: return '(nil, nil)
-	(list interpreter-args script-args)
+	;; Got nothing
+	(list interpreter-args nil script-args)
       ;; else
-      ;; Strip off optional "perl" or "perl5.10.1" etc.
+      ;; Remove "perl" or "perl5.10.1" etc.
       (when (string-match interp-regexp
 			  (file-name-sans-extension
 			   (file-name-nondirectory (car args))))
 	(setq interpreter-args (list (pop args)))
 
-	;; Strip off Perl-specific options
-	(while (and args
-		    (string-match "^-" (car args)))
-	  (setq pair (realgud-parse-command-arg
-		      args perl-two-args perl-opt-two-args))
-	  (nconc interpreter-args (car pair))
-	  (setq args (cadr pair))))
-
-      (list interpreter-args args))
+	;; Skip to the first non-option argument
+	(while (and args (not script-name))
+	  (let ((arg (car args)))
+	    (cond
+	     ;; Options with arguments.
+	     ((string-match "^-" (car args))
+	      (setq pair (realgud-parse-command-arg
+			  args perl-two-args perl-opt-two-args))
+	      (nconc interpreter-args (car pair))
+	      (setq args (cadr pair)))
+	     ;; Anything else must be the script to debug.
+	     (t (setq script-name (realgud:expand-file-name-if-exists arg))
+		(setq script-args (cons script-name (cdr args))))
+	     )))
+	(list interpreter-args nil script-args)))
     ))
 
 ; # To silence Warning: reference to free variable
-(defvar realgud-perldb-command-name)
+(defvar realgud:perldb-command-name)
 
-(defun realgud-perldb-suggest-invocation (debugger-name)
+(defun realgud:perldb-suggest-invocation (debugger-name)
   "Suggest a perldb command invocation via `realgud-suggest-invocaton'"
-  (realgud-suggest-invocation realgud-perldb-command-name perldb-minibuffer-history
-			   "perl" "\\.pl$"))
+  (realgud-suggest-invocation realgud:perldb-command-name
+			      realgud:perldb-minibuffer-history
+			      "perl" "\\.pl$"))
 
-(defun realgud-perldb-reset ()
+(defun realgud:perldb-reset ()
   "Perldb cleanup - remove debugger's internal buffers (frame,
 breakpoints, etc.)."
   (interactive)
@@ -123,9 +137,9 @@ breakpoints, etc.)."
 ;; 	  perldb-debugger-support-minor-mode-map-when-deactive))
 
 
-(defun realgud-perldb-customize ()
+(defun realgud:perldb-customize ()
   "Use `customize' to edit the settings of the `perldb' debugger."
   (interactive)
-  (customize-group 'realgud-perldb))
+  (customize-group 'realgud:perldb))
 
-(provide-me "realgud-perldb-")
+(provide-me "realgud:perldb-")

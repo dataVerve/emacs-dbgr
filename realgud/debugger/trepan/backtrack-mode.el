@@ -1,4 +1,4 @@
-;;; Copyright (C) 2011 Rocky Bernstein <rocky@gnu.org>
+;;; Copyright (C) 2011, 2014 Rocky Bernstein <rocky@gnu.org>
 
 ;;; Mode for parsing various kinds of backtraces found in the Ruby
 
@@ -10,15 +10,16 @@
 			 "../../common/backtrack-mode"
 			 )
 		       "realgud-")
-(require-relative-list '("core" "init") "realgud-trepan-")
+(require-relative-list '("core" "init") "realgud:trepan-")
 (require-relative-list '("../../lang/ruby") "realgud-lang-")
 
 (realgud-backtrack-mode-vars "trepan")
 (set-keymap-parent trepan-backtrack-mode-map realgud-backtrack-mode-map)
 
-(declare-function realgud-backtrack-mode(bool))
+(declare-function realgud-backtrack-mode         'realgud-common-backtrack-mode)
+(declare-function realgud-backtrack-set-debugger 'realgud-common-backtrack-mode)
 
-(defun realgud-trepan-goto-control-frame-line (pt)
+(defun realgud:trepan-goto-control-frame-line (pt)
   "Display the location mentioned by a control-frame line
 described by PT."
   (interactive "d")
@@ -26,7 +27,7 @@ described by PT."
 
 (realgud-ruby-populate-command-keys trepan-backtrack-mode-map)
 (define-key trepan-backtrack-mode-map
-  (kbd "C-c !c") 'realgud-trepan-goto-control-frame-line)
+  (kbd "C-c !c") 'realgud:trepan-goto-control-frame-line)
 
 (define-minor-mode trepan-backtrack-mode
   "Minor mode for tracking ruby debugging inside a file which may not have process shell."
@@ -34,7 +35,7 @@ described by PT."
   ;; :lighter " trepan"   ;; mode-line indicator from realgud-track is sufficient.
   ;; The minor mode bindings.
   :global nil
-  :group 'trepan
+  :group 'realgud:trepan
   :keymap trepan-backtrack-mode-map
 
   (realgud-backtrack-set-debugger "trepan")
@@ -56,4 +57,4 @@ described by PT."
     (message "trepan backtrack-mode-hook disable called"))
 )
 
-(provide-me "realgud-trepan-")
+(provide-me "realgud:trepan-")

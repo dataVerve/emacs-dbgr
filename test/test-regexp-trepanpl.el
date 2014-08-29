@@ -4,12 +4,12 @@
 
 (test-simple-start)
 
-(set (make-local-variable 'bps)
-     (gethash "brkpt-set"       realgud-trepanpl-pat-hash))
+(set (make-local-variable 'helper-bps)
+     (gethash "brkpt-set"       realgud:trepanpl-pat-hash))
 (set (make-local-variable 'prompt)
-     (gethash "prompt"          realgud-trepanpl-pat-hash))
-(set (make-local-variable 'tb)
-     (gethash "lang-backtrace"  realgud-trepanpl-pat-hash))
+     (gethash "prompt"          realgud:trepanpl-pat-hash))
+(set (make-local-variable 'helper-tb)
+     (gethash "lang-backtrace"  realgud:trepanpl-pat-hash))
 
 ;; ;; FIXME: we get a void variable somewhere in here when running
 ;; ;;        even though we define it in lexical-let. Dunno why.
@@ -42,7 +42,7 @@
 
 (note "prompt matching")
 (set (make-local-variable 'prompt-pat)
-     (gethash "prompt" realgud-trepanpl-pat-hash))
+     (gethash "prompt" realgud:trepanpl-pat-hash))
 (prompt-match "(trepanpl): ")
 (prompt-match "((trepanpl)): " nil "nested debugger prompt: %s")
 (setq prompt-str "trepanpl:")
@@ -54,12 +54,12 @@
 (assert-t (numberp (bp-loc-match text))
 	  "basic breakpoint location")
 (assert-equal "/tmp/File/Basename.pm"
-	      (match-string (realgud-loc-pat-file-group bps)
+	      (match-string (realgud-loc-pat-file-group helper-bps)
 			    text)
 	      "extract breakpoint file name"
 	      )
 (assert-equal "215"
-	      (match-string (realgud-loc-pat-line-group bps)
+	      (match-string (realgud-loc-pat-line-group helper-bps)
 			    text)
 	      "extract breakpoint line number"
 	      )
@@ -67,15 +67,15 @@
 (setq text "Breakpoint 1 set in (eval 1177)[/Eval.pm:94] at line 5")
 (assert-t (numberp (bp-loc-match text)) "eval breakpoint location")
 (set (make-local-variable 'bps-pat)
-     (gethash "brkpt-set"          realgud-trepanpl-pat-hash))
+     (gethash "brkpt-set"          realgud:trepanpl-pat-hash))
 (set (make-local-variable 'dbg-bt-pat)
-     (gethash "debugger-backtrace" realgud-trepanpl-pat-hash))
+     (gethash "debugger-backtrace" realgud:trepanpl-pat-hash))
 (set (make-local-variable 'prompt-pat)
-     (gethash "prompt"             realgud-trepanpl-pat-hash))
+     (gethash "prompt"             realgud:trepanpl-pat-hash))
 (set (make-local-variable 'lang-bt-pat)
-     (gethash "lang-backtrace"     realgud-trepanpl-pat-hash))
+     (gethash "lang-backtrace"     realgud:trepanpl-pat-hash))
 (set (make-local-variable 'ctrl-pat)
-     (gethash "control-frame"      realgud-trepanpl-pat-hash))
+     (gethash "control-frame"      realgud:trepanpl-pat-hash))
 
 (note "prompt")
 (prompt-match "(trepanpl): ")

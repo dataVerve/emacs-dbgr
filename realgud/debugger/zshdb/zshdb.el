@@ -1,28 +1,35 @@
-;;; Copyright (C) 2011 Rocky Bernstein <rocky@gnu.org>
+;;; Copyright (C) 2011, 2014 Rocky Bernstein <rocky@gnu.org>
 ;;  `zshdb' Main interface to zshdb via Emacs
+(require 'list-utils)
 (require 'load-relative)
 (require-relative-list '("../../common/helper") "realgud-")
-(require-relative-list '("../../common/track") "realgud-")
-(require-relative-list '("core" "track-mode") "realgud-zshdb-")
+(require-relative-list '("../../common/track")  "realgud-")
+(require-relative-list '("../../common/run")    "realgud:")
+(require-relative-list '("core" "track-mode")   "realgud:zshdb-")
+
+(declare-function zshdb-track-mode (bool))
+(declare-function zshdb-query-cmdline  'realgud:zshdb-core)
+(declare-function zshdb-parse-cmd-args 'realgud:zshdb-core)
+(declare-function realgud-run-process 'realgud-core)
+
 ;; This is needed, or at least the docstring part of it is needed to
-;; get the customization menu to work in Emacs 23.
-(defgroup zshdb nil
-  "The Zsh debugger: zshdb"
-  :group 'processes
-  :group 'dbgr
-  :version "23.1")
+;; get the customization menu to work in Emacs 24.
+(defgroup realgud:zshdb nil
+  "The realgud interface to the Zsh debugger, zshdb"
+  :group 'realgud
+  :version "24.1")
 
 ;; -------------------------------------------------------------------
 ;; User definable variables
 ;;
 
-(defcustom zshdb-command-name
+(defcustom realgud:zshdb-command-name
   ;;"zshdb --emacs 3"
   "zshdb"
   "File name for executing the zshdb and its command options.
 This should be an executable on your path, or an absolute file name."
   :type 'string
-  :group 'zshdb)
+  :group 'realgud:zshdb)
 
 (declare-function zshdb-track-mode (bool))
 
@@ -30,30 +37,39 @@ This should be an executable on your path, or an absolute file name."
 ;; The end.
 ;;
 
+(declare-function zshdb-track-mode     'realgud-zshdb-track-mode)
+(declare-function zshdb-query-cmdline  'realgud:zshdb-core)
+(declare-function zshdb-parse-cmd-args 'realgud:zshdb-core)
+(declare-function realgud:run-debugger 'realgud:run)
+
+; ### FIXME: DRY with other top-level routines
 ;;;###autoload
-(defun realgud-zshdb (&optional opt-command-line no-reset)
+(defun realgud:zshdb (&optional opt-cmd-line no-reset)
   "Invoke the zshdb Z-shell debugger and start the Emacs user interface.
 
-String COMMAND-LINE specifies how to run zshdb.
+String OPT-CMD-LINE specifies how to run zshdb.
 
-Normally command buffers are reused when the same debugger is
+OPT-CMD-LINE is treated like a shell string; arguments are
+tokenized by `split-string-and-unquote'. The tokenized string is
+parsed by `zshdb-parse-cmd-args' and path elements found by that
+are expanded using `realgud:expand-file-name-if-exists'.
+
+Normally, command buffers are reused when the same debugger is
 reinvoked inside a command buffer with a similar command. If we
 discover that the buffer has prior command-buffer information and
 NO-RESET is nil, then that information which may point into other
 buffers and source buffers which may contain marks and fringe or
-marginal icons is reset."
+marginal icons is reset. See `loc-changes-clear-buffer' to clear
+fringe and marginal icons.
+"
   (interactive)
-  (let* ((cmd-str (or opt-command-line (zshdb-query-cmdline "zshdb")))
-	 (cmd-args (split-string-and-unquote cmd-str))
-	 (parsed-args (zshdb-parse-cmd-args cmd-args))
-	 (script-args (cdr cmd-args))
-	 (script-name (car script-args))
-	 (cmd-buf))
-    (realgud-run-process "zshdb" script-name cmd-args
-		      'zshdb-track-mode no-reset)
-    ))
+  (realgud:run-debugger "zshdb" 'zshdb-query-cmdline
+			'zshdb-parse-cmd-args
+			'zshdb-track-mode-hook
+			'realgud:zshdb-minibuffer-history
+			opt-cmd-line no-reset)
+  )
 
-(defalias 'zshdb 'realgud-zshdb)
+(defalias 'zshdb 'realgud:zshdb)
+
 (provide-me "realgud-")
-
-;;; zshdb.el ends here

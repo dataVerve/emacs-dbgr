@@ -1,4 +1,4 @@
-;;; Copyright (C) 2010 Rocky Bernstein <rocky@gnu.org>
+;;; Copyright (C) 2010, 2014 Rocky Bernstein <rocky@gnu.org>
 (eval-when-compile (require 'cl))
 
 (require 'load-relative)
@@ -6,13 +6,17 @@
 			 "../../common/core"
 			 "../../common/lang")
 		       "realgud-")
-(require-relative-list '("init") "realgud-trepan2-")
+(require-relative-list '("init") "realgud:trepan2-")
 
+(declare-function realgud:expand-file-name-if-exists 'realgud-core)
+(declare-function realgud-parse-command-arg  'realgud-core)
+(declare-function realgud-query-cmdline      'realgud-core)
+(declare-function realgud-suggest-invocation 'realgud-core)
 
 ;; FIXME: I think the following could be generalized and moved to
 ;; realgud-... probably via a macro.
-(defvar trepan2-minibuffer-history nil
-  "minibuffer history list for the command `trepan2'.")
+(defvar realgud:trepan2-minibuffer-history nil
+  "minibuffer history list for the command `realgud:trepan2'.")
 
 (easy-mmode-defmap trepan2-minibuffer-local-map
   '(("\C-i" . comint-dynamic-complete-filename))
@@ -25,7 +29,7 @@
   (realgud-query-cmdline
    'trepan2-suggest-invocation
    trepan2-minibuffer-local-map
-   'trepan2-minibuffer-history
+   'realgud:trepan2-minibuffer-history
    opt-debugger))
 
 (defun trepan2-parse-cmd-args (orig-args)
@@ -127,16 +131,19 @@ NOTE: the above should have each item listed in quotes.
 	    (nconc debugger-args (car pair))
 	    (setq args (cadr pair)))
 	   ;; Anything else must be the script to debug.
-	   (t (setq script-name arg)
-	      (setq script-args args))
+	   (t (setq script-name (realgud:expand-file-name-if-exists arg))
+	      (setq script-args (cons script-name (cdr args))))
 	   )))
       (list interpreter-args debugger-args script-args annotate-p))))
 
-(defvar trepan2-command-name) ; # To silence Warning: reference to free variable
+;; To silence Warning: reference to free variable
+(defvar realgud:trepan2-command-name)
+
 (defun trepan2-suggest-invocation (debugger-name)
   "Suggest a trepan2 command invocation via `realgud-suggest-invocaton'"
-  (realgud-suggest-invocation trepan2-command-name trepan2-minibuffer-history
-			   "python" "\\.py"))
+  (realgud-suggest-invocation realgud:trepan2-command-name
+			      realgud:trepan2-minibuffer-history
+			      "python" "\\.py"))
 
 (defun trepan2-reset ()
   "Trepan2 cleanup - remove debugger's internal buffers (frame,
@@ -157,9 +164,9 @@ breakpoints, etc.)."
 ;; 	  trepan2-debugger-support-minor-mode-map-when-deactive))
 
 
-(defun trepan2-customize ()
+(defun realgud:trepan2-customize ()
   "Use `customize' to edit the settings of the `trepan2' debugger."
   (interactive)
-  (customize-group 'trepan2))
+  (customize-group 'realgud:trepan2))
 
-(provide-me "realgud-trepan2-")
+(provide-me "realgud:trepan2-")

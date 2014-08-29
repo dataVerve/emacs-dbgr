@@ -1,5 +1,6 @@
 (require 'test-simple)
 (load-file "../realgud/debugger/pydbgr/pydbgr.el")
+(declare-function pydbgr-parse-cmd-args 'pydbgr-pdb)
 
 (test-simple-start)
 

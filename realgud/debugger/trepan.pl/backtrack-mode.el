@@ -1,4 +1,4 @@
-;;; Copyright (C) 2011 Rocky Bernstein <rocky@gnu.org>
+;;; Copyright (C) 2011, 2014 Rocky Bernstein <rocky@gnu.org>
 
 ;;; Mode for parsing various kinds of backtraces found in Perl
 
@@ -7,18 +7,26 @@
 (require-relative-list '(
 			 "../../common/cmds"
 			 "../../common/menu"
+                         "../../common/track-mode"
 			 "../../common/backtrack-mode"
 			 )
 		       "realgud-")
-(require-relative-list '("core" "init") "realgud-trepanpl-")
+(require-relative-list '("core" "init") "realgud:trepanpl-")
 (require-relative-list '("../../lang/perl") "realgud-lang-")
+
+(declare-function realgud-goto-line-for-pt
+		  'realgud-track-mode)
+(declare-function realgud-backtrack-set-debugger
+		  'realgud-common-backtrack-mode)
+(declare-function realgud-perl-populate-command-keys
+		  'realgud-lang-perl)
 
 (realgud-backtrack-mode-vars "trepanpl")
 (set-keymap-parent trepanpl-backtrack-mode-map realgud-backtrack-mode-map)
 
 (declare-function realgud-backtrack-mode(bool))
 
-(defun realgud-trepanpl-goto-control-frame-line (pt)
+(defun realgud:trepanpl-goto-control-frame-line (pt)
   "Display the location mentioned by a control-frame line
 described by PT."
   (interactive "d")
@@ -26,7 +34,7 @@ described by PT."
 
 (realgud-perl-populate-command-keys trepanpl-backtrack-mode-map)
 (define-key trepanpl-backtrack-mode-map
-  (kbd "C-c !c") 'realgud-trepanpl-goto-control-frame-line)
+  (kbd "C-c !c") 'realgud:trepanpl-goto-control-frame-line)
 
 (define-minor-mode trepanpl-backtrack-mode
   "Minor mode for tracking ruby debugging inside a file which may not have process shell."
@@ -34,7 +42,7 @@ described by PT."
   ;; :lighter " trepanpl"   ;; mode-line indicator from realgud-track is sufficient.
   ;; The minor mode bindings.
   :global nil
-  :group 'trepanpl
+  :group 'realgud:trepanpl
   :keymap trepanpl-backtrack-mode-map
 
   (realgud-backtrack-set-debugger "trepan.pl")
@@ -56,4 +64,4 @@ described by PT."
     (message "trepan.pl backtrack-mode-hook disable called"))
 )
 
-(provide-me "realgud-trepanpl-")
+(provide-me "realgud:trepanpl-")

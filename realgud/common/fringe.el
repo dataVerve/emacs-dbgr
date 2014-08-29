@@ -1,5 +1,10 @@
-;;; Copyright (C) 2010, 2012 Rocky Bernstein <rocky@gnu.org>
+;;; Copyright (C) 2010, 2012, 2014 Rocky Bernstein <rocky@gnu.org>
 ;; Fringe marks for history of stopping points
+(require 'load-relative)
+(require-relative-list '("helper") "realgud-")
+
+(declare-function realgud-loc-hist-item-at       'realgud-lochist)
+(declare-function buffer-killed?                 'helper)
 
 ;; Bitmap for hollow overlay-arrow in fringe
 (if (display-images-p)
@@ -104,21 +109,18 @@ for example to indicate a debugger position."
 	 (cmd-mark2 (and loc2 (realgud-loc-cmd-marker loc2)))
 	 (cmd-mark3 (and loc1 (realgud-loc-cmd-marker loc1)))
 	 )
-    (if (and loc3 (not (equal mark3 mark2)))
-	(progn
-	  (realgud-fringe-set-arrow 'realgud-overlay-arrow3 mark3)
-	  (if do-cmdbuf?
-	      (realgud-fringe-set-arrow 'realgud-overlay-arrow3 cmd-mark3))))
-    (if (and loc2 (not (equal mark2 mark1)))
-	(progn
-	  (realgud-fringe-set-arrow 'realgud-overlay-arrow2 mark2)
-	  (if do-cmdbuf?
-	      (realgud-fringe-set-arrow 'realgud-overlay-arrow2 cmd-mark2))))
-    (if loc1
-	(progn
-	  (realgud-fringe-set-arrow 'realgud-overlay-arrow1 mark1)
-	  (if do-cmdbuf?
-	      (realgud-fringe-set-arrow 'realgud-overlay-arrow1 cmd-mark1))))
+    (when (and loc3 (not (equal mark3 mark2)))
+      (realgud-fringe-set-arrow 'realgud-overlay-arrow3 mark3)
+      (if do-cmdbuf?
+	  (realgud-fringe-set-arrow 'realgud-overlay-arrow3 cmd-mark3)))
+    (when (and loc2 (not (equal mark2 mark1)))
+      (realgud-fringe-set-arrow 'realgud-overlay-arrow2 mark2)
+      (if do-cmdbuf?
+	  (realgud-fringe-set-arrow 'realgud-overlay-arrow2 cmd-mark2)))
+    (when loc1
+      (realgud-fringe-set-arrow 'realgud-overlay-arrow1 mark1)
+      (if do-cmdbuf?
+	  (realgud-fringe-set-arrow 'realgud-overlay-arrow1 cmd-mark1)))
     ))
 
 (defun realgud-fringe-erase-history-arrows ()

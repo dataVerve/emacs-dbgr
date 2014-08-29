@@ -1,4 +1,4 @@
-;;; Copyright (C) 2011 Rocky Bernstein <rocky@gnu.org>
+;;; Copyright (C) 2011, 2014 Rocky Bernstein <rocky@gnu.org>
 ;;; Common Python constants and regular expressions.
 (eval-when-compile (require 'cl))
 
@@ -19,8 +19,8 @@ traceback) line."  )
   "Bind the debugger function key layout used by many debuggers.
 
 \\{realgud-example-map-standard}"
-  (define-key map (kbd "C-c !b") 'realgud-goto-debugger-backtrace-line)
-  (define-key map (kbd "C-c !!") 'realgud-goto-lang-backtrace-line)
+  (define-key map (kbd "C-c !b") 'realgud:goto-debugger-backtrace-line)
+  (define-key map (kbd "C-c !!") 'realgud:goto-lang-backtrace-line)
   )
 
 (provide-me "realgud-lang-")

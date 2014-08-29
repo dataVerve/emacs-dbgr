@@ -1,6 +1,6 @@
-;; Copyright (C) 2010, 2012 Rocky Bernstein <rocky@gnu.org> 
+;; Copyright (C) 2010, 2012-2014 Rocky Bernstein <rocky@gnu.org>
 ;;
-;; Python "pydbgr" Debugger tracking a comint or eshell buffer.
+;; Python "pydbgr" Debugger tracking a comint buffer.
 
 (eval-when-compile (require 'cl))
 (require 'load-relative)
@@ -11,11 +11,16 @@
 			 "../../common/track-mode"
 			 )
 		       "realgud-")
+
+(require-relative-list '("../../lang/python") "realgud-lang-")
 (require-relative-list '("core" "init") "realgud-pydbgr-")
 
 (realgud-track-mode-vars "pydbgr")
 
-(declare-function realgud-track-mode(bool))
+(declare-function realgud-track-mode 'realgud-track-mode)
+(declare-function realgud-track-mode-setup 'realgud-track-mode)
+(declare-function realgud:track-set-debugger 'realgud-track-mode)
+(declare-function realgud-python-populate-command-keys 'realgud-lang-python)
 
 (realgud-python-populate-command-keys pydbgr-track-mode-map)
 
@@ -30,17 +35,21 @@
 )
 
 (define-minor-mode pydbgr-track-mode
-  "Minor mode for tracking ruby debugging inside a process shell."
+  "Minor mode for tracking pydbgr source locations inside a process shelll via realgud. pydbgr is a Python debugger. See URL `https://code.google.com/p/pydbgr/'.
+
+If called interactively with no prefix argument, the mode is toggled. A prefix argument, captured as ARG, enables the mode if the argument is positive, and disables it otherwise.
+
+\\{pydbgr-track-mode-map}
+"
   :init-value nil
   ;; :lighter " pydbgr"   ;; mode-line indicator from realgud-track is sufficient.
   ;; The minor mode bindings.
   :global nil
-  :group 'pydbgr
+  :group 'realgud:pydbgr
   :keymap pydbgr-track-mode-map
-  (realgud-track-set-debugger "pydbgr")
+  (realgud:track-set-debugger "pydbgr")
   (if pydbgr-track-mode
       (progn
-	(setq realgud-track-mode 't)
 	(realgud-track-mode-setup 't)
 	(run-mode-hooks (intern (pydbgr-track-mode-hook))))
     (progn

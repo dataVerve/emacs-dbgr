@@ -1,10 +1,19 @@
-;;; Copyright (C) 2010, 2011 Rocky Bernstein <rocky@gnu.org>
+;;; Copyright (C) 2010-2011, 2013-2014 Rocky Bernstein <rocky@gnu.org>
 (require 'load-relative)
-(require-relative-list  '("send") "realgud-")
+(require-relative-list  '("send" "core") "realgud-")
 (require-relative-list  '("buffer/command") "realgud-buffer-")
+(require-relative-list  '("buffer/source") "realgud-buffer-")
 
-(declare-function realgud-terminate &optional cmdbuf)
-(declare-function realgud-terminate-srcbuf &optional cmdbuf)
+(declare-function buffer-killed? 'helper)
+(declare-function realgud-cmdbuf-info-in-srcbuf?=   'realgud-buffer-command)
+(declare-function realgud-cmdbuf?      'realgud-buffer-command)
+(declare-function realgud-command      'realgud-cmd)
+(declare-function realgud-get-cmdbuf   'realgud-buffer-helper)
+(declare-function realgud-get-command  'realgud-buffer-command)
+(declare-function realgud-get-bpnum-from-line-num 'realgud-buffer-source)
+
+(declare-function realgud-terminate 'realgud-core)
+(declare-function realgud-terminate-srcbuf 'realdgud-core)
 
 (defun realgud-cmd-remap(arg cmd-name default-cmd-template key
 			  &optional no-record? frame-switch? realgud-prompts?)
@@ -39,14 +48,14 @@ if none has been set in the command hash."
   )
 
 (defun realgud-cmd-backtrace(arg)
-  "Show debugger breakpoint at the current line"
+  "Show the current call stack"
   (interactive "p")
   (realgud-cmd-remap arg "backtrace" "backtrace" "T")
   )
 
 (defun realgud-cmd-break(arg)
   "Set a breakpoint at the current line"
-  (interactive "p")
+  (interactive "bsource buffer: ")
   (realgud-cmd-remap arg "break" "break %X:%l" "b")
   )
 
@@ -55,6 +64,29 @@ if none has been set in the command hash."
     (interactive "MContinue args: ")
     (realgud-cmd-remap arg "continue" "continue" "c")
 )
+
+(defun realgud-cmd-delete(arg)
+    "Delete breakpoint."
+    (interactive "pBreakpoint number: ")
+    (let* ((line-num (line-number-at-pos))
+	   (arg (realgud-get-bpnum-from-line-num line-num)))
+      (if arg
+	  (realgud-cmd-remap arg "delete" "delete %p" "D")
+	(message "Can't find breakpoint at line %d" line-num))
+      )
+    )
+
+(defun realgud-cmd-disable(&optional arg)
+    "Disable breakpoint."
+    (interactive "NBreakpoint number: ")
+    (realgud-cmd-remap arg "disable" "disable %p" "-")
+    )
+
+(defun realgud-cmd-enable(&optional arg)
+    "Enable breakpoint."
+    (interactive "NBreakpoint number: ")
+    (realgud-cmd-remap arg "enable" "enable %p" "+")
+    )
 
 (defun realgud-cmd-eval(arg)
     "Exaluate an expression."
@@ -105,11 +137,21 @@ With a numeric argument, step that many times. This command is
 often referred to as 'step through' as opposed to 'step into' or
 'step out'.
 
-The definition of 'step' is debugger specific so, see the
+The definition of 'next' is debugger specific so, see the
 debugger documentation for a more complete definition of what is
 getting stepped."
     (interactive "p")
     (realgud-cmd-remap arg "next" "next %p" "n")
+)
+
+(defun realgud-cmd-next-no-arg(&optional arg)
+    "Step one source line at current call level.
+
+The definition of 'next' is debugger specific so, see the
+debugger documentation for a more complete definition of what is
+getting stepped."
+    (interactive)
+    (realgud-cmd-remap nil "next" "next" "n")
 )
 
 (defun realgud-cmd-older-frame(&optional arg)
@@ -143,6 +185,16 @@ debugger documentation for a more complete definition of what is
 getting stepped."
     (interactive "p")
     (realgud-cmd-remap arg "step" "step %p" "s")
+)
+
+(defun realgud-cmd-step-no-arg()
+    "Step one source line.
+
+The definition of 'step' is debugger specific so, see the
+debugger documentation for a more complete definition of what is
+getting stepped."
+    (interactive)
+    (realgud-cmd-remap nil "step" "step" "s")
 )
 
 (defun realgud-cmd-terminate (&optional arg)

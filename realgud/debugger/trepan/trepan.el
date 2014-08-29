@@ -1,59 +1,59 @@
-;;; Copyright (C) 2010-2011, 2013 Rocky Bernstein <rocky@gnu.org>
+;;; Copyright (C) 2010-2011, 2013-2014 Rocky Bernstein <rocky@gnu.org>
 ;;  `trepan' Main interface to trepan via Emacs
 (require 'load-relative)
 (require-relative-list '("../../common/helper") "realgud-")
-(require-relative-list '("../../common/track") "realgud-")
-(require-relative-list '("core" "track-mode") "realgud-trepan-")
+(require-relative-list '("../../common/run")    "realgud:")
+(require-relative-list '("core" "track-mode") "realgud:trepan-")
+
+(declare-function realgud:trepan-query-cmdline  'realgud:trepan-core)
+(declare-function realgud:trepan-parse-cmd-args 'realgud:trepan-core)
+(declare-function realgud:run-debugger 'realgud:run)
+
 ;; This is needed, or at least the docstring part of it is needed to
-;; get the customization menu to work in Emacs 23.
-(defgroup trepan nil
-  "The Ruby 1.9.2 1.9.3 \"trepanning\" debugger"
-  :group 'processes
+;; get the customization menu to work in Emacs 24.
+(defgroup realgud:trepan nil
+  "The realgud interface to the Ruby 1.9.2 1.9.3 \"trepanning\" debugger"
   :group 'ruby
-  :group 'dbgr
-  :version "23.1")
+  :group 'realgud
+  :version "24.1")
 
 ;; -------------------------------------------------------------------
-;; User definable variables
+;; User-definable variables
 ;;
 
-(defcustom trepan-command-name
+(defcustom realgud:trepan-command-name
   ;;"trepan --emacs 3"
   "trepan"
   "File name for executing the Ruby debugger and command options.
 This should be an executable on your path, or an absolute file name."
   :type 'string
-  :group 'trepan)
-
-(defun realgud-trepan-fn (&optional opt-command-line no-reset)
-  "See `realgud-trepan' for details."
-
-  (let* ((cmd-str (or opt-command-line (trepan-query-cmdline "trepan")))
-	 (cmd-args (split-string-and-unquote cmd-str))
-	 (parsed-args (trepan-parse-cmd-args cmd-args))
-	 (script-args (cdr cmd-args))
-	 (script-name (car script-args))
-	 (cmd-buf
-	   (realgud-run-process "trepan" script-name cmd-args
-			     'trepan-track-mode no-reset)
-	   ))
-  ))
+  :group 'realgud:trepan)
 
 ;;;###autoload
-(defun realgud-trepan (&optional opt-command-line no-reset)
+(defun realgud:trepan (&optional opt-cmd-line no-reset)
   "Invoke the trepan Ruby debugger and start the Emacs user interface.
 
-String COMMAND-LINE specifies how to run trepan.
+String OPT-CMD-LINE is treated like a shell string; arguments are
+tokenized by `split-string-and-unquote'. The tokenized string is
+parsed by `trepan-parse-cmd-args' and path elements found by that
+are expanded using `expand-file-name'.
 
-Normally command buffers are reused when the same debugger is
+Normally, command buffers are reused when the same debugger is
 reinvoked inside a command buffer with a similar command. If we
 discover that the buffer has prior command-buffer information and
 NO-RESET is nil, then that information which may point into other
 buffers and source buffers which may contain marks and fringe or
-marginal icons is reset."
+marginal icons is reset. See `loc-changes-clear-buffer' to clear
+fringe and marginal icons.
+"
   (interactive)
-  (realgud-trepan-fn opt-command-line no-reset))
+  (realgud:run-debugger "trepan" 'realgud:trepan-query-cmdline
+			'realgud:trepan-parse-cmd-args
+			'trepan-track-mode-hook
+			'realgud:trepan-minibuffer-history
+			opt-cmd-line no-reset)
+  )
 
-(defalias 'trepan 'realgud-trepan)
+(defalias 'trepan 'realgud:trepan)
 (provide-me "realgud-")
 ;;; trepan.el ends here

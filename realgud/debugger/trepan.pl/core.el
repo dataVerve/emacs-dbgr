@@ -1,4 +1,4 @@
-;;; Copyright (C) 2011-2012 Rocky Bernstein <rocky@gnu.org>
+;;; Copyright (C) 2011-2012, 2014 Rocky Bernstein <rocky@gnu.org>
 (eval-when-compile (require 'cl))
 
 (require 'load-relative)
@@ -6,47 +6,51 @@
                          "../../common/core"
                          "../../common/lang")
                        "realgud-")
-(require-relative-list '("init") "realgud-trepanpl-")
+(require-relative-list '("init") "realgud:trepanpl-")
+
+(declare-function realgud:expand-file-name-if-exists 'realgud-core)
+(declare-function realgud-parse-command-arg  'realgud-core)
+(declare-function realgud-query-cmdline      'realgud-core)
+(declare-function realgud-suggest-invocation 'realgud-core)
 
 ;; FIXME: I think the following could be generalized and moved to
 ;; realgud-... probably via a macro.
-(defvar trepanpl-minibuffer-history nil
-  "minibuffer history list for the command `trepanpl'.")
+(defvar realgud:trepanpl-minibuffer-history nil
+  "minibuffer history list for the command `realgud:trepan.pl'.")
 
-(easy-mmode-defmap realgud-trepanpl-minibuffer-local-map
+(easy-mmode-defmap realgud:trepanpl-minibuffer-local-map
   '(("\C-i" . comint-dynamic-complete-filename))
   "Keymap for minibuffer prompting of trepanpl startup command."
   :inherit minibuffer-local-map)
 
 ;; FIXME: I think this code and the keymaps and history
 ;; variable chould be generalized, perhaps via a macro.
-(defun realgud-trepanpl-query-cmdline (&optional opt-debugger)
+(defun realgud:trepanpl-query-cmdline (&optional opt-debugger)
   (realgud-query-cmdline
-   'realgud-trepanpl-suggest-invocation
-   realgud-trepanpl-minibuffer-local-map
-   'realgud-trepanpl-minibuffer-history
+   'realgud:trepanpl-suggest-invocation
+   realgud:trepanpl-minibuffer-local-map
+   'realgud:trepanpl-minibuffer-history
    opt-debugger))
 
-(defun realgud-trepanpl-parse-cmd-args (orig-args)
-  "Parse command line ARGS for the annotate level and name of script to debug.
+;;; FIXME: DRY this with other *-parse-cmd-args routines
+(defun realgud:trepanpl-parse-cmd-args (orig-args)
+  "Parse command line ORIG-ARGS for the annotate level and name of script to debug.
 
-ARGS should contain a tokenized list of the command line to run.
+ORIG_ARGS should contain a tokenized list of the command line to run.
 
-We return the a list containing
+We return the a list containing:
+* the command processor (e.g. perl) and it's arguments if any - a list of strings
+* the name of the debugger given (e.g. trepan.pl) and its arguments - a list of strings
+* the script name and its arguments - list of strings
 
-- the command processor (e.g. perl) and it's arguments if any - a
-  list of strings
-
-- the script name and its arguments - list of strings
-
-For example for the following input
+For example for the following input:
   (map 'list 'symbol-name
-   '(perl5.10 -W -C /tmp trepan.pl --emacs ./gcd.pl a b))
+   '(perl5.10 -w -I . trepan.pl --cd . ./gcd.pl a b))
 
 we might return:
-   ((perl -W -C) (trepan.pl --emacs) (./gcd.pl a b) 't)
+   ((\"perl\" \"-w\" \"-I\" \"/tmp\") (\"trepan.pl\" \"cd\" \"/tmp\") (\"/tmp/gcd.pl\" \"a\" \"b\"))
 
-NOTE: the above should have each item listed in quotes.
+Note that the script name path has been expanded via `expand-file-name'.
 "
 
   ;; Parse the following kind of pattern:
@@ -54,7 +58,7 @@ NOTE: the above should have each item listed in quotes.
   (let (
         (args orig-args)
         (pair)          ;; temp return from
-        (perl-opt-two-args '("0" "C" "D" "i" "l" "m" "-module" "x"))
+        (perl-opt-two-args '("0" "C" "D" "i" "I" "l" "m" "-module" "x"))
         ;; Perl doesn't have mandatory 2-arg options in our sense,
         ;; since the two args can be run together, e.g. "-C/tmp" or "-C /tmp"
         ;;
@@ -95,19 +99,48 @@ NOTE: the above should have each item listed in quotes.
           (nconc interpreter-args (car pair))
           (setq args (cadr pair))))
 
-      (list interpreter-args args))
+      ;; Remove "trepan.pl" from "trepan.pl --trepan.pl-options script
+      ;; --script-options"
+      (setq debugger-name (file-name-nondirectory (car args)))
+      (unless (string-match "^trepan.pl$" debugger-name)
+	(message
+	 "Expecting debugger name `%s' to be `trepan.pl'"
+	 debugger-name))
+      (setq debugger-args (list (pop args)))
+
+      ;; Skip to the first non-option argument.
+      (while (and args (not script-name))
+	(let ((arg (car args)))
+	  (cond
+	   ((member arg
+		    '("--cmddir" "--batch" "--cd" "--include" "-I" "--module" "-M"
+		      "-c" "--command"))
+	    (setq arg (pop args))
+	    (nconc debugger-args
+		   (list arg (expand-file-name (pop args)))))
+	   ;; Other options with arguments.
+	   ((string-match "^-" arg)
+	    (setq pair (realgud-parse-command-arg
+			args trepanpl-two-args trepanpl-opt-two-args))
+	    (nconc debugger-args (car pair))
+	    (setq args (cadr pair)))
+	   ;; Anything else must be the script to debug.
+	   (t (setq script-name (realgud:expand-file-name-if-exists arg))
+	      (setq script-args (cons script-name (cdr args))))
+	   )))
+      (list interpreter-args debugger-args script-args))
     ))
 
 ; # To silence Warning: reference to free variable
-(defvar realgud-trepanpl-command-name)
+(defvar realgud:trepanpl-command-name)
 
-(defun realgud-trepanpl-suggest-invocation (debugger-name)
+(defun realgud:trepanpl-suggest-invocation (debugger-name)
   "Suggest a trepanpl command invocation via `realgud-suggest-invocaton'"
-  (realgud-suggest-invocation realgud-trepanpl-command-name
-                           trepanpl-minibuffer-history
-                           "perl" "\\.pl$" "trepan.pl"))
+  (realgud-suggest-invocation realgud:trepanpl-command-name
+			      realgud:trepanpl-minibuffer-history
+			      "perl" "\\.pl$" "trepan.pl"))
 
-(defun realgud-trepanpl-reset ()
+(defun realgud:trepanpl-reset ()
   "Trepanpl cleanup - remove debugger's internal buffers (frame,
 breakpoints, etc.)."
   (interactive)
@@ -126,9 +159,10 @@ breakpoints, etc.)."
 ;;        trepanpl-debugger-support-minor-mode-map-when-deactive))
 
 
-(defun realgud-trepanpl-customize ()
-  "Use `customize' to edit the settings of the `trepanpl' debugger."
+(defun realgud:trepanpl-customize ()
+  "Use `customize' to edit the settings of the
+`realgud:trepan.pl' debugger."
   (interactive)
-  (customize-group 'realgud-trepanpl))
+  (customize-group 'realgud:trepanpl))
 
-(provide-me "realgud-trepanpl-")
+(provide-me "realgud:trepanpl-")

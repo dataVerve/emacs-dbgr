@@ -1,4 +1,4 @@
-;;; Copyright (C) 2012 Rocky Bernstein <rocky@gnu.org>
+;;; Copyright (C) 2012-2014 Rocky Bernstein <rocky@gnu.org>
 (eval-when-compile (require 'cl))
 
 (require 'load-relative)
@@ -6,12 +6,17 @@
 			 "../../common/core"
 			 "../../common/lang")
 		       "realgud-")
-(require-relative-list '("init") "realgud-pdb-")
+(require-relative-list '("init") "realgud:pdb-")
 
+
+(declare-function realgud-lang-mode? 'realgud-lang)
+(declare-function realgud-parse-command-arg 'realgud-core)
+(declare-function realgud-query-cmdline 'realgud-core)
+(declare-function realgud-suggest-invocation 'realgud-core)
 
 ;; FIXME: I think the following could be generalized and moved to
 ;; realgud-... probably via a macro.
-(defvar pdb-minibuffer-history nil
+(defvar realgud:pdb-minibuffer-history nil
   "minibuffer history list for the command `pdb'.")
 
 (easy-mmode-defmap pdb-minibuffer-local-map
@@ -25,28 +30,28 @@
   (realgud-query-cmdline
    'pdb-suggest-invocation
    pdb-minibuffer-local-map
-   'pdb-minibuffer-history
+   'realgud:pdb-minibuffer-history
    opt-debugger))
 
 (defun pdb-parse-cmd-args (orig-args)
-  "Parse command line ARGS for the annotate level and name of script to debug.
+  "Parse command line ORIG-ARGS for the annotate level and name of script to debug.
 
-ARGS should contain a tokenized list of the command line to run.
+ORIG-ARGS should contain a tokenized list of the command line to run.
 
-We return the a list containing
-- the command processor (e.g. python) and it's arguments if any - a list of strings
-- the name of the debugger given (e.g. pdb) and its arguments - a list of strings
-- the script name and its arguments - list of strings
-- whether the annotate or emacs option was given ('-A', '--annotate' or '--emacs) - a boolean
+We return the a list containing:
+* the command processor (e.g. python) and it's arguments if any - a list of strings
+* the name of the debugger given (e.g. pdb) and its arguments - a list of strings
+* the script name and its arguments - list of strings
+* whether the annotate or emacs option was given ('-A', '--annotate' or '--emacs) - a boolean
 
-For example for the following input
+For example for the following input:
   (map 'list 'symbol-name
    '(python2.6 -O -Qold ./gcd.py a b))
 
 we might return:
-   ((python2.6 -O -Qold) (pdb) (./gcd.py a b) 't)
+   ((\"python2.6\" \"-O\" \"-Qold\") (\"pdb\") (\"/tmp/gcd.py\" \"a\" \"b\") nil)
 
-NOTE: the above should have each item listed in quotes.
+Note that the script name path has been expanded via `expand-file-name'.
 "
 
   ;; Parse the following kind of pattern:
@@ -115,16 +120,19 @@ NOTE: the above should have each item listed in quotes.
 	    (nconc debugger-args (car pair))
 	    (setq args (cadr pair)))
 	   ;; Anything else must be the script to debug.
-	   (t (setq script-name arg)
-	      (setq script-args args))
+	   (t (setq script-name (expand-file-name arg))
+	      (setq script-args (cons script-name (cdr args))))
 	   )))
       (list interpreter-args debugger-args script-args annotate-p))))
 
-(defvar pdb-command-name) ; # To silence Warning: reference to free variable
+;; To silence Warning: reference to free variable
+(defvar realgud:pdb-command-name)
+
 (defun pdb-suggest-invocation (debugger-name)
   "Suggest a pdb command invocation via `realgud-suggest-invocaton'"
-  (realgud-suggest-invocation pdb-command-name pdb-minibuffer-history
-			   "python" "\\.py"))
+  (realgud-suggest-invocation realgud:pdb-command-name
+			      realgud:pdb-minibuffer-history
+			      "python" "\\.py"))
 
 (defun pdb-reset ()
   "Pdb cleanup - remove debugger's internal buffers (frame,
@@ -145,9 +153,9 @@ breakpoints, etc.)."
 ;; 	  pdb-debugger-support-minor-mode-map-when-deactive))
 
 
-(defun pdb-customize ()
+(defun realgud:pdb-customize ()
   "Use `customize' to edit the settings of the `pdb' debugger."
   (interactive)
-  (customize-group 'pdb))
+  (customize-group 'realgud:pdb))
 
-(provide-me "realgud-pdb-")
+(provide-me "realgud:pdb-")

@@ -1,4 +1,4 @@
-;;; Copyright (C) 2010, 2012 Rocky Bernstein <rocky@gnu.org>
+;;; Copyright (C) 2010, 2012, 2014 Rocky Bernstein <rocky@gnu.org>
 ;;; Ruby "rdebug" Debugger tracking a comint or eshell buffer.
 
 (eval-when-compile (require 'cl))
@@ -15,7 +15,10 @@
 
 (realgud-track-mode-vars "rdebug")
 
-(declare-function realgud-track-mode(bool))
+(declare-function realgud-track-mode 'realgud-track-mode)
+(declare-function realgud-track-mode-hook 'realgud-track-mode)
+(declare-function realgud-track-mode-setup 'realgud-track-mode)
+(declare-function realgud:track-set-debugger 'realgud-track-mode)
 
 (realgud-ruby-populate-command-keys rdebug-track-mode-map)
 
@@ -29,19 +32,24 @@
 )
 
 (define-minor-mode rdebug-track-mode
-  "Minor mode for tracking ruby debugging inside a process shell."
+  "Minor mode for tracking rdebug source locations inside a process shell via realgud. rdebug is a Ruby debugger.
+
+If called interactively with no prefix argument, the mode is toggled. A prefix argument, captured as ARG, enables the mode if the argument is positive, and disables it otherwise.
+
+\\{rdebug-track-mode-map}
+"
   :init-value nil
   ;; :lighter " rdebug"   ;; mode-line indicator from realgud-track is sufficient.
   ;; The minor mode bindings.
   :global nil
-  :group 'rdebug
+  :group 'realgud:rdebug
   :keymap rdebug-track-mode-map
   (rdebug-track-mode-internal rdebug-track-mode)
 )
 
 ;; Broken out as a function for debugging
 (defun rdebug-track-mode-internal (&optional arg)
-  (realgud-track-set-debugger "rdebug")
+  (realgud:track-set-debugger "rdebug")
   (if rdebug-track-mode
       (progn
 	(setq realgud-track-mode 't)

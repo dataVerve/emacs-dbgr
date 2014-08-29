@@ -2,8 +2,26 @@
 (load-file "../realgud/common/buffer/source.el")
 (load-file "../realgud/common/buffer/command.el")
 (load-file "../realgud/debugger/trepan/init.el")
+(load-file "../realgud/debugger/trepan/track-mode.el")
+
+(declare-function realgud-cmdbuf-init 'realgud-buffer-command)
+(declare-function realgud-srcbuf-init 'realgud-buffer-source)
+(declare-function __FILE__            'require-relative)
+
+(declare-function realgud-srcbuf?                   'realgud-buffer-source)
+(declare-function realgud-srcbuf-loc-p              'realgud-loc)
+(declare-function realgud-srcbuf-info-debugger-name 'realgud-loc)
+(declare-function realgud-srcbuf-info-cmdproc       'realgud-track)
+(declare-function realgud-srcbuf-init-or-update     'realgud-track)
 
 (test-simple-start)
+
+(eval-when-compile
+  (defvar realgud-pat-hash)
+  (defvar realgud-srcbuf-info)
+  (defvar temp-srcbuf)
+  (defvar test-filename)
+)
 
 (defvar temp-cmdbuf nil)
 (defun tear-down()
@@ -21,26 +39,13 @@
 (setq realgud-srcbuf-info nil)
 (assert-nil (realgud-srcbuf? (current-buffer))
 	    "realgud-srcbuf? before init - but nil")
-(assert-equal nil (realgud-srcbuf-command-string (current-buffer))
-	      "realgud-srcbuf-command-string - uninit")
 
 (note "realgud-srcbuf-init")
 (setup)
-(realgud-srcbuf-init temp-srcbuf temp-cmdbuf
-		  "trepan"
-		  '("/bin/trepan" "--emacs" "gcd.rb" "1"))
-(assert-equal "trepan"
-	      (with-current-buffer temp-srcbuf
-		(realgud-srcbuf-info-debugger-name
-		 realgud-srcbuf-info)))
+(realgud-srcbuf-init temp-srcbuf temp-cmdbuf)
 
 (assert-t (realgud-srcbuf? temp-srcbuf)
 	  "realgud-srcbuf? after init")
-
-(assert-equal "/bin/trepan --emacs gcd.rb 1"
-	      (realgud-srcbuf-command-string
-	       temp-srcbuf)
-	      "realgud-srcbuf-command-string")
 
 (assert-equal temp-cmdbuf
 	      (with-current-buffer temp-srcbuf

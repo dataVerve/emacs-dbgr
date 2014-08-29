@@ -1,4 +1,4 @@
-;;; Copyright (C) 2010 Rocky Bernstein <rocky@gnu.org>
+;;; Copyright (C) 2010, 2014 Rocky Bernstein <rocky@gnu.org>
 (eval-when-compile (require 'cl))
 
 (require 'load-relative)
@@ -7,12 +7,16 @@
 			 "../../common/core"
 			 "../../common/lang")
 		       "realgud-")
-(require-relative-list '("init") "realgud-trepanx-")
+(require-relative-list '("init") "realgud:trepanx-")
+
+(declare-function realgud-parse-command-arg  'realgud-core)
+(declare-function realgud-query-cmdline      'realgud-core)
+(declare-function realgud-suggest-invocation 'realgud-core)
 
 ;; FIXME: I think the following could be generalized and moved to
 ;; realgud-... probably via a macro.
-(defvar trepanx-minibuffer-history nil
-  "minibuffer history list for the command `trepanx'.")
+(defvar realgud:trepanx-minibuffer-history nil
+  "minibuffer history list for the command `realgud:trepanx'.")
 
 (easy-mmode-defmap trepanx-minibuffer-local-map
   '(("\C-i" . comint-dynamic-complete-filename))
@@ -25,7 +29,7 @@
   (realgud-query-cmdline
    'trepanx-suggest-invocation
    trepanx-minibuffer-local-map
-   'trepanx-minibuffer-history
+   'realgud:trepanx-minibuffer-history
    opt-debugger))
 
 (defun trepanx-parse-cmd-args (orig-args)
@@ -126,11 +130,14 @@ NOTE: the above should have each item listed in quotes.
 	   )))
       (list interpreter-args debugger-args script-args annotate-p))))
 
-(defvar trepanx-command-name) ; # To silence Warning: reference to free variable
+;; To silence Warning: reference to free variable
+(defvar realgud:trepanx-command-name)
+
 (defun trepanx-suggest-invocation (debugger-name)
   "Suggest a trepanx command invocation via `realgud-suggest-invocaton'"
-  (realgud-suggest-invocation trepanx-command-name trepanx-minibuffer-history
-			   "ruby" "\\.rb$" "trepanx"))
+  (realgud-suggest-invocation realgud:trepanx-command-name
+			      realgud:trepanx-minibuffer-history
+			      "ruby" "\\.rb$" "trepanx"))
 
 (defun trepanx-reset ()
   "Trepanx cleanup - remove debugger's internal buffers (frame,
@@ -151,9 +158,9 @@ breakpoints, etc.)."
 ;; 	  trepanx-debugger-support-minor-mode-map-when-deactive))
 
 
-(defun trepanx-customize ()
+(defun realgud:trepanx-customize ()
   "Use `customize' to edit the settings of the `trepanx' debugger."
   (interactive)
-  (customize-group 'trepanx))
+  (customize-group 'realgud:trepanx))
 
-(provide-me "realgud-trepanx-")
+(provide-me "realgud:trepanx-")

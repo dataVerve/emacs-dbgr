@@ -10,6 +10,7 @@ pats = ["^(?:Loading",
         "make -C",
         "Test-Unit",
         "Fontifying",
+        "`flet'",
         '\s*$',
         '##[<>]+$'
        ].join('|') + ')'
@@ -17,6 +18,7 @@ pats = ["^(?:Loading",
 skip_re = /#{pats}/
 
 while gets()
-  next if $_ =~ skip_re
+  next if $_.encode!('UTF-8', 'binary',
+                     invalid: :replace, undef: :replace, replace: '') =~ skip_re
   puts $_
 end

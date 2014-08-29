@@ -1,13 +1,19 @@
 ;;; Debugger Backtrace buffer mode settings
-;;; Copyright (C) 2011 Rocky Bernstein <rocky@gnu.org>
+;;; Copyright (C) 2011, 2013 Rocky Bernstein <rocky@gnu.org>
 (require 'load-relative)
-(require-relative-list  '("menu") "realgud-")
+(require-relative-list  '("menu" "key") "realgud-")
+(require-relative-list  '("buffer/command") "realgud-buffer-")
+
+(declare-function realgud-populate-debugger-menu 'realgud-menu)
+(declare-function realgud-populate-common-keys 'realgud-menu)
+(declare-function realgud-cmdbuf-pat 'realgud-menu)
+
 (defvar realgud-backtrace-mode-map
   (let ((map  (realgud-populate-debugger-menu (make-sparse-keymap))))
     (suppress-keymap map)
     (realgud-populate-common-keys map)
     (define-key map "."       'realgud-backtrace-moveto-frame-selected)
-    (define-key map "r"       'realgud-backtrace-init)
+    (define-key map "r"       'realgud:backtrace-init)
     (define-key map [double-mouse-1] 'realgud-goto-frame-mouse)
     (define-key map [mouse-2] 'realgud-goto-frame-mouse)
     (define-key map [mouse-3] 'realgud-goto-frame-mouse)
@@ -49,7 +55,7 @@
     ;; (define-key map [menu-bar debugger stack goto]
     ;;   '(menu-item "Goto frame" realgud-goto-frame))
     map)
-  "Keymap to navigate dbgr stack frames.")
+  "Keymap to navigate realgud stack frames.")
 
 (defun realgud-backtrace-mode (&optional cmdbuf)
   "Major mode for displaying the stack frames.
@@ -58,7 +64,7 @@
   (kill-all-local-variables)
   (setq buffer-read-only 't)
   (setq major-mode 'realgud-backtrace-mode)
-  (setq mode-name "dbgr Stack Frames")
+  (setq mode-name "Realgud Stack Frames")
   ;; (set (make-local-variable 'realgud-secondary-buffer) t)
   (setq mode-line-process 'realgud-mode-line-process)
   (use-local-map realgud-backtrace-mode-map)

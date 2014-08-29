@@ -1,8 +1,8 @@
-;;; Copyright (C) 2011 Rocky Bernstein <rocky@gnu.org> Used to parse
-;;;  programming-language backtrace-like tracks output. In contrast to
-;;;  track-mode, there doesn't have to be a process shell arround
-;;; Compare with backtrace-mode.el which handles backtraces inside the
-;;; debugger
+;;; Copyright (C) 2011, 2013, 2014 Rocky Bernstein <rocky@gnu.org>
+;;;  Used to parse programming-language backtrace-like tracks
+;;;  output. In contrast to track-mode, there doesn't have to be a
+;;;  process shell arround Compare with backtrace-mode.el which
+;;;  handles backtraces inside the debugger
 
 (eval-when-compile (require 'cl))
 (require 'shell)
@@ -14,6 +14,10 @@
    "send"   "shortkey") "realgud-")
 
 (require-relative-list  '("buffer/command") "realgud-buffer-")
+
+(declare-function realgud:debugger-name-transform 'realgud-helper)
+(declare-function realgud-populate-debugger-menu  'realgud-menu)
+(declare-function realgud:track-set-debugger      'realgud-track)
 
 (defvar realgud-backtrack-mode-map
   (let ((map (make-sparse-keymap)))
@@ -28,7 +32,7 @@
   "Keymap used in `realgud-backtrack-minor-mode'.")
 
 ;; FIXME figure out if I can put this in something like a header file.
-;; FIXME: combine with realgud-track-set-debugger's completing read
+;; FIXME: combine with realgud:track-set-debugger's completing read
 (defun realgud-backtrack-set-debugger (debugger-name)
   "Set debugger name This info is returned or nil if we can't find a
 debugger with that information"
@@ -36,8 +40,7 @@ debugger with that information"
    (list (completing-read "Debugger name: " realgud-pat-hash)))
   (let ((regexp-hash (gethash debugger-name realgud-pat-hash)))
     (if regexp-hash
-	(let* ((prefix
-		(if (equal debugger-name "gdb") "realgud-gdb" debugger-name))
+	(let* ((prefix (realgud:debugger-name-transform debugger-name))
 	       (specific-track-mode (intern (concat prefix "-backtrack-mode")))
 	       )
 	  (if (and (not (eval specific-track-mode))
@@ -80,7 +83,7 @@ Use the command `%s-track-mode' to toggle or set this variable." name name))
 (defun realgud-backtrack-mode-body(name)
   "Used in by custom debuggers: pydbgr, trepan, gdb, etc. NAME is
 the name of the debugger which is used to preface variables."
-  (realgud-track-set-debugger name)
+  (realgud:track-set-debugger name)
   (funcall (intern (concat "realgud-define-" name "-commands")))
   (if (intern (concat name "-backtrack-mode"))
       (progn

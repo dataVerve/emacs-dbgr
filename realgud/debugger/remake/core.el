@@ -1,13 +1,24 @@
-;;; Copyright (C) 2011 Rocky Bernstein <rocky@gnu.org>
+;;; Copyright (C) 2011, 2014 Rocky Bernstein <rocky@gnu.org>
 (eval-when-compile (require 'cl))
 
 (require 'load-relative)
-(require-relative-list '("../../common/track" "../../common/core") "realgud-")
-(require-relative-list '("init") "realgud-remake-")
+(require-relative-list '("../../common/track" "../../common/core")
+		       "realgud-")
+(require-relative-list '("../../common/buffer/command")
+		       "realgud-buffer-")
+(require-relative-list '("init") "realgud:remake-")
 
+(declare-function realgud:expand-file-name-if-exists 'realgud-core)
+(declare-function realgud-parse-command-arg  'realgud-core)
+(declare-function realgud-query-cmdline      'realgud-core)
+(declare-function realgud-suggest-invocation 'realgud-core)
+(declare-function realgud-cmdbuf-command-string
+		                             'realgud-buffer-command)
+(declare-function realgud-cmdbuf-debugger-name
+		                             'realgud-buffer-command)
 ;; FIXME: I think the following could be generalized and moved to
 ;; realgud-... probably via a macro.
-(defvar remake-minibuffer-history nil
+(defvar realgud:remake-minibuffer-history nil
   "minibuffer history list for the command `remake'.")
 
 (easy-mmode-defmap remake-minibuffer-local-map
@@ -21,7 +32,7 @@
   (realgud-query-cmdline
    'remake-suggest-invocation
    remake-minibuffer-local-map
-   'remake-minibuffer-history
+   'realgud:remake-minibuffer-history
    opt-debugger))
 
 (defun remake-parse-cmd-args (orig-args)
@@ -83,7 +94,8 @@ we might return:
 
 	   ((member arg '("--file" "--makefile" "-f"))
 	    (setq remake-args (nconc remake-args (list arg)))
-	    (setq makefile-name (pop args))
+	    (setq makefile-name (realgud:expand-file-name-if-exists
+				 (pop args)))
 	    (setq remake-args (nconc remake-args
 				     (list (format "%s" makefile-name)))))
 
@@ -92,12 +104,12 @@ we might return:
 	   )))
       (list remake-name makefile-name remake-args))))
 
-(defconst realgud-remake-auto-suffix-regexp
+(defconst realgud:remake-auto-suffix-regexp
   "\\.\\(am\\|in\\)$"
   "Common automake and autoconf Makefile suffixes"
 )
 
-(defconst realgud-remake-makefile-regexp
+(defconst realgud:remake-makefile-regexp
   "\\(^[Mm]akefile$\\|\\.Makefile$\\|\\.mk\\)$"
   "Regular expression matching common Makefile names"
 )
@@ -108,16 +120,16 @@ we might return:
 	)
     (if (realgud-lang-mode? filename "makefile")
 	(progn
-	  (if (string-match realgud-remake-makefile-regexp filename)
+	  (if (string-match realgud:remake-makefile-regexp filename)
 	      (setq priority 8)
-	    (if (string-match realgud-remake-auto-suffix-regexp filename)
+	    (if (string-match realgud:remake-auto-suffix-regexp filename)
 		(setq priority 5)
 	      (setq priority 7)))
 	  ))
     ;; The file isn't in a makefile-mode buffer,
     ;; Check for an executable file with a .mk extension.
     (if (setq is-not-directory (not (file-directory-p filename)))
-	(if (and (string-match realgud-remake-makefile-regexp filename))
+	(if (and (string-match realgud:remake-makefile-regexp filename))
 	    (if (< priority 6)
 		(progn
 		  (setq priority 6)))))
@@ -159,20 +171,18 @@ given priority, we use the first one we find."
       result)
     )
 
-(defvar remake-command-name) ; # To silence Warning: reference to free variable
+;; To silence Warning: reference to free variable
+(defvar realgud:remake-command-name)
 
 (defun remake-suggest-invocation (debugger-name)
   "Suggest a remake command invocation via `realgud-suggest-invocaton'"
 
   (let* ((buf (current-buffer))
 	 (cmd-str-cmdbuf (realgud-cmdbuf-command-string buf))
-	 (cmd-str-srcbuf (realgud-srcbuf-command-string buf))
 	 )
     (cond
      ((and cmd-str-cmdbuf (equal debugger-name (realgud-cmdbuf-debugger-name buf)))
       cmd-str-cmdbuf)
-     ((and cmd-str-srcbuf (equal debugger-name (realgud-srcbuf-debugger-name buf)))
-      cmd-str-srcbuf)
      ((and minibuffer-history (listp minibuffer-history))
       (car minibuffer-history))
      (t (concat debugger-name " --debugger -f "
@@ -183,7 +193,7 @@ given priority, we use the first one we find."
 ;; into one that invokes an Emacs-enabled debugging session.
 ;; "--debugger" in inserted as the first switch.
 
-(defun realgud-remake-massage-args (command-line)
+(defun realgud:remake-massage-args (command-line)
   (let* ((new-args (list "--debugger"))
 	 (args (split-string-and-unquote command-line))
 	 (program (car args))
@@ -231,9 +241,9 @@ breakpoints, etc.)."
 ;; 	  remake-debugger-support-minor-mode-map-when-deactive))
 
 
-(defun remake-customize ()
+(defun realgud:remake-customize ()
   "Use `customize' to edit the settings of the `remake' debugger."
   (interactive)
-  (customize-group 'remake))
+  (customize-group 'realgud:remake))
 
-(provide-me "realgud-remake-")
+(provide-me "realgud:remake-")

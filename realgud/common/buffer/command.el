@@ -1,9 +1,12 @@
 ;;; process-command buffer things
-;;; Copyright (C) 2010, 2011, 2012 Rocky Bernstein <rocky@gnu.org>
+;;; Copyright (C) 2010-2012, 2014 Rocky Bernstein <rocky@gnu.org>
 
 (require 'load-relative)
+(require 'json)
 (require-relative-list
  '("../fringe" "../helper" "../loc" "../lochist" "../regexp") "realgud-")
+
+(declare-function realgud-get-cmdbuf 'realgud-buffer-helper)
 
 (eval-when-compile
   (byte-compile-disable-warning 'cl-functions)
@@ -26,13 +29,13 @@
     (t (:weight bold)))
   "Face used to highlight debugger run information."
   :group 'realgud
-  :version "23.1")
+  :version "24.1")
 
 (defface debugger-not-running
   '((t :inherit font-lock-warning-face))
   "Face used when debugger or process is not running."
   :group 'realgud
-  :version "23.1")
+  :version "24.1")
 
 
 (defstruct realgud-cmdbuf-info
@@ -43,6 +46,8 @@
 		       ;; command buffer?
   in-srcbuf?           ;; If true, selected window should be the source buffer.
 		       ;; Otherwise, the command buffer?
+  last-input-end       ;; point where input last ended. Set from
+                       ;; comint-last-input-end
   prior-prompt-regexp  ;; regular expression prompt (e.g.
                        ;; comint-prompt-regexp) *before* setting
                        ;; loc-regexp
@@ -78,6 +83,7 @@
 (realgud-struct-field-setter "realgud-cmdbuf-info" "bp-list")
 (realgud-struct-field-setter "realgud-cmdbuf-info" "bt-buf")
 (realgud-struct-field-setter "realgud-cmdbuf-info" "cmd-args")
+(realgud-struct-field-setter "realgud-cmdbuf-info" "last-input-end")
 (realgud-struct-field-setter "realgud-cmdbuf-info" "divert-output?")
 (realgud-struct-field-setter "realgud-cmdbuf-info" "frame-switch?")
 (realgud-struct-field-setter "realgud-cmdbuf-info" "in-srcbuf?")
@@ -86,7 +92,7 @@
 (realgud-struct-field-setter "realgud-cmdbuf-info" "src-shortkey?")
 (realgud-struct-field-setter "realgud-cmdbuf-info" "in-debugger?")
 
-(defun realgud-cmdbuf-info-describe (&optional buffer)
+(defun realgud:cmdbuf-info-describe (&optional buffer)
   "Display realgud-cmdcbuf-info fields of BUFFER.
 BUFFER is either a debugger command or source buffer. If BUFFER is not given
 the current buffer is used as a starting point.
@@ -102,26 +108,28 @@ Information is put in an internal buffer called *Describe*."
 	  (mapc 'insert
 		(list
 		 (format "realgud-cmdbuf-info for %s\n\n" cmdbuf-name)
-		 (format "Debugger name (debugger-name): %s\n"
-			 (realgud-cmdbuf-info-debugger-name info))
-		 (format "Command-line args (cmd-args): %s\n"
-			 (realgud-cmdbuf-info-cmd-args info))
+		 (format "Debugger name (debugger-name):\t%s\n"
+			 (json-encode (realgud-cmdbuf-info-debugger-name info)))
+		 (format "Command-line args (cmd-args):\t%s\n"
+			 (json-encode (realgud-cmdbuf-info-cmd-args info)))
 		 (format "Selected window should contain source? (in-srcbuf?): %s\n"
 			 (realgud-cmdbuf-info-in-srcbuf? info))
+		 (format "Last input end:\t%s\n"
+			 (realgud-cmdbuf-info-last-input-end info))
 		 (format "Source should go into short-key mode? (src-shortkey?): %s\n"
 			 (realgud-cmdbuf-info-src-shortkey? info))
-		 (format "Breakpoint list (bp-list): %s\n"
+		 (format "Breakpoint list (bp-list):\t %s\n"
 			 (realgud-cmdbuf-info-bp-list info))
 		 (format "Remap table for debugger commands: %s\n"
-			 (realgud-cmdbuf-info-cmd-hash info))
+			 (json-encode (realgud-cmdbuf-info-cmd-hash info)))
 		 (format "Source buffers seen (srcbuf-list): %s\n"
 			 (realgud-cmdbuf-info-srcbuf-list info))
-		 (format "Backtrace buffer (bt): %s\n"
+		 (format "Backtrace buffer (bt):\t%s\n"
 			 (realgud-cmdbuf-info-bt-buf info))
-		 (format "In debugger? (in-debugger?): %s\n"
+		 (format "In debugger? (in-debugger?):\t%s\n"
 			 (realgud-cmdbuf-info-in-debugger? info))
 		 ))
-	  (realgud-loc-hist-describe (realgud-cmdbuf-info-loc-hist info))
+	  (realgud:loc-hist-describe (realgud-cmdbuf-info-loc-hist info))
 	  )
 	)
     (message "Buffer %s is not a debugger source or command buffer; nothing done."
@@ -215,7 +223,7 @@ Information is put in an internal buffer called *Describe*."
 ;; inside pat-hash
 ;;
 ;; To do this however we need to fix up the caller
-;; realgud-track-set-debugger by changing realgud-pat-hash to store a hash
+;; realgud:track-set-debugger by changing realgud-pat-hash to store a hash
 ;; rather than the loc, file, and line fields; those fields then get
 ;; removed.
 
@@ -239,6 +247,7 @@ as a main program."
 	     :loc-hist (make-realgud-loc-hist)
 	     :regexp-hash regexp-hash
 	     :bt-buf nil
+	     :last-input-end (point-max)
 	     :cmd-hash cmd-hash
 	     :src-shortkey? 't
 	     :in-debugger? nil

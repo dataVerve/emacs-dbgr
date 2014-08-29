@@ -1,4 +1,4 @@
-;;; Copyright (C) 2010, 2012 Rocky Bernstein <rocky@gnu.org>
+;;; Copyright (C) 2010, 2012, 2014 Rocky Bernstein <rocky@gnu.org>
 ;;; Debugger location ring
 ;;; Commentary:
 
@@ -11,8 +11,10 @@
 (require 'load-relative)
 (require-relative-list '("loc") "realgud-")
 
+(declare-function realgud:loc-describe 'realgud-loc)
+
 (defcustom realgud-loc-hist-size 20  ; For testing. Should really be larger.
-  "Size of dbgr position history ring"
+  "Size of realgud's position history ring"
   :type 'integer
   :group 'realgud)
 
@@ -21,7 +23,7 @@
   (position -1)
   (ring (make-ring realgud-loc-hist-size)))
 
-(defun realgud-loc-hist-describe(loc-hist)
+(defun realgud:loc-hist-describe(loc-hist)
   "Format LOC-HIST values inside buffer *Describe*"
   (switch-to-buffer (get-buffer-create "*Describe*"))
   (mapc 'insert
@@ -30,10 +32,10 @@
 	 (format "  position   : %d\n" (realgud-loc-hist-position loc-hist))))
   (let ((locs (cddr (realgud-loc-hist-ring loc-hist)))
 	(loc)
-	(i 1))
-    (while (and (setq loc (elt locs i)) (realgud-loc? loc) (<= i (length locs)))
+	(i 0))
+    (while (and (< i (length locs)) (setq loc (elt locs i)) (realgud-loc? loc) )
       (insert (format "    i: %d\n" i))
-      (realgud-loc-describe loc)
+      (realgud:loc-describe loc)
       (insert "    ----\n")
       (setq i (1+ i))
       )

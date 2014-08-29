@@ -1,37 +1,39 @@
-;;; Copyright (C) 2011 Rocky Bernstein <rocky@gnu.org>
+;;; Copyright (C) 2011, 2014 Rocky Bernstein <rocky@gnu.org>
 ;;  `kshdb' Main interface to kshdb via Emacs
 (require 'load-relative)
 (require-relative-list '("../../common/helper") "realgud-")
 (require-relative-list '("../../common/track") "realgud-")
-(require-relative-list '("core" "track-mode") "realgud-kshdb-")
+(require-relative-list '("core" "track-mode") "realgud:kshdb-")
 ;; This is needed, or at least the docstring part of it is needed to
-;; get the customization menu to work in Emacs 23.
-(defgroup kshdb nil
-  "The Korn shell debugger: kshdb"
-  :group 'processes
-  :group 'dbgr
-  :version "23.1")
+;; get the customization menu to work in Emacs 24.
+(defgroup realgud:kshdb nil
+  "The realgud interface to the Korn shell debugger, kshdb"
+  :group 'realgud
+  :version "24.1")
 
 ;; -------------------------------------------------------------------
 ;; User definable variables
 ;;
 
-(defcustom kshdb-command-name
+(defcustom realgud:kshdb-command-name
   ;;"kshdb --emacs 3"
   "kshdb"
   "File name for executing the kshdb and its command options.
 This should be an executable on your path, or an absolute file name."
   :type 'string
-  :group 'kshdb)
+  :group 'realgud:kshdb)
 
 (declare-function kshdb-track-mode (bool))
+(declare-function kshdb-query-cmdline  'realgud:kshdb-core)
+(declare-function kshdb-parse-cmd-args 'realgud:kshdb-core)
+(declare-function realgud-run-process 'realgud-core)
 
 ;; -------------------------------------------------------------------
 ;; The end.
 ;;
 
 ;;;###autoload
-(defun realgud-kshdb (&optional opt-command-line no-reset)
+(defun realgud:kshdb (&optional opt-command-line no-reset)
   "Invoke the kshdb Z-shell debugger and start the Emacs user interface.
 
 String COMMAND-LINE specifies how to run kshdb.
@@ -50,10 +52,11 @@ marginal icons is reset."
 	 (script-name (car script-args))
 	 (cmd-buf))
     (realgud-run-process "kshdb" script-name cmd-args
-		      'kshdb-track-mode no-reset)
+			 'realgud:kshdb-minibuffer-history
+			 'kshdb-track-mode no-reset)
     ))
 
-(defalias 'kshdb 'realgud-kshdb)
+(defalias 'kshdb 'realgud:kshdb)
 (provide-me "realgud-")
 
 ;;; kshdb.el ends here
